@@ -1,0 +1,11 @@
+.git
+.gitignore
+.venv
+venv
+**/__pycache__
+**/.pytest_cache
+frontend/node_modules
+frontend/dist
+backend/life_dashboard_staging.db*
+backend/backups
+*.log

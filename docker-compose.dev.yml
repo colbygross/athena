@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  athena-backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: athena-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      # Live bind-mount backend code: edits on host reflect immediately without rebuilding
+      - ./backend:/app/backend
+      # Isolated staging database so your production database is never touched
+      - ./backend/life_dashboard_staging.db:/app/backend/life_dashboard_staging.db
+      - ./obsidian_vault:/app/obsidian_vault
+      - ./storage:/app/storage
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/backend
+      - TZ=America/New_York
+      - DB_PATH=/app/backend/life_dashboard_staging.db
+      - WORKSPACE_DIR=/app
+      - ENVIRONMENT=staging
+
+  athena-frontend-dev:
+    image: node:22-alpine
+    container_name: athena-frontend-dev
+    working_dir: /app/frontend
+    restart: unless-stopped
+    ports:
+      - "5174:5173"
+    volumes:
+      # Live bind-mount frontend code: Vite HMR pushes changes to browser in milliseconds
+      - ./frontend:/app/frontend
+      # Anonymous volume prevents host node_modules from conflicting with container
+      - /app/frontend/node_modules
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8001/api}
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"

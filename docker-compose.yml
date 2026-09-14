@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  athena:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./backend/life_dashboard.db:/app/backend/life_dashboard.db
+      - ./obsidian_vault:/app/obsidian_vault
+      - ./storage:/app/storage
+    environment:
+      - TZ=${TZ:-America/New_York}
+      - PYTHONPATH=/app/backend
+      - DB_PATH=/app/backend/life_dashboard.db
+      - WORKSPACE_DIR=/app
+      - PYTHONUNBUFFERED=1
+      - LLM_ENABLED=${LLM_ENABLED:-false}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

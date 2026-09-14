@@ -1,0 +1,83 @@
+# ATHENA - .gitignore
+
+# Environment & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Python Virtual Environments & Packages
+.venv/
+venv/
+ENV/
+env/
+pyvenv.cfg
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / JS dependencies and build outputs
+node_modules/
+/frontend/dist/
+/frontend/dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
+
+# SQLite Databases & runtime DB files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Local Storage, Backups & Agent Runs
+.agents/
+storage/*
+!storage/.gitkeep
+backups/
+backend/backups/
+*.bak
+
+# Personal Notes / Obsidian Vault Markdown Files
+obsidian_vault/**/*.md
+obsidian_vault/*.md
+!obsidian_vault/**/.gitkeep
+!obsidian_vault/.gitkeep
+
+# Obsidian Local Workspace Settings & Calendar
+**/.obsidian/workspace
+**/.obsidian/workspace.json
+obsidian_vault/calendar.ics
+
+# Scratch, Local Notes & Temporary Scripts
+*.local
+*.local.*
+read_pdf.py
+design_base64.txt
+
+# IDEs & Editor Files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db

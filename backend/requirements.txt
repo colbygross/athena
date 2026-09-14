@@ -1,0 +1,11 @@
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.7.2
+python-dotenv==1.0.1
+google-generativeai==0.5.4
+pytest==8.2.1
+icalendar==6.0.1
+google-api-python-client==2.129.0
+google-auth-oauthlib==1.2.0
+playwright==1.44.0
+
