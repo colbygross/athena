@@ -16,8 +16,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "life_dashboard.db")
+import database
+
+BASE_DIR = os.getenv("WORKSPACE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def clean_html_to_plaintext(raw_text):
     """Converts HTML & double-encoded entities (&lt;p&gt;, &#39;) into clean human-readable plain text."""
@@ -65,9 +66,7 @@ REMOTE_PATTERNS = [
 ]
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return database.create_new_connection()
 
 def classify_location(location_str, title_str, description_str="", source=""):
     """

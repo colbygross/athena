@@ -1572,12 +1572,14 @@ def reconcile_tasks_in_db(scanned_tasks):
     finally:
         conn.close()
 
-def parse_workout_regimen(vault_dir, day_name):
+def parse_workout_regimen(vault_dir, day_identifier):
     """
-    Parses Workout_Routine.md in vault_dir/02_Areas/Fitness/.
-    Finds the routine for the given day of the week (e.g. 'Monday').
+    Parses Workout_Routine.md or Workout_Regimen.md in vault_dir/02_Areas/Fitness/.
+    Supports either day of the week (e.g. 'Monday') or numeric cycle index (e.g. 0 -> 'Day 1', 1 -> 'Day 2').
     """
     regimen_path = os.path.join(vault_dir, "02_Areas", "Fitness", "Workout_Routine.md")
+    if not os.path.exists(regimen_path):
+        regimen_path = os.path.join(vault_dir, "02_Areas", "Fitness", "Workout_Regimen.md")
     if not os.path.exists(regimen_path):
         return None
         
@@ -1585,14 +1587,24 @@ def parse_workout_regimen(vault_dir, day_name):
         with open(regimen_path, "r", encoding="utf-8") as f:
             content = f.read()
             
-        header_pattern = re.compile(
-            rf"^###\s*{day_name}\b.*$", 
-            re.MULTILINE | re.IGNORECASE
-        )
+        if isinstance(day_identifier, int):
+            day_label = f"Day {day_identifier + 1}"
+            header_pattern = re.compile(
+                rf"^###\s*({re.escape(day_label)}[^\n]*)", 
+                re.MULTILINE | re.IGNORECASE
+            )
+        else:
+            day_label = str(day_identifier)
+            header_pattern = re.compile(
+                rf"^###\s*({re.escape(day_label)}\b[^\n]*)", 
+                re.MULTILINE | re.IGNORECASE
+            )
+
         header_match = header_pattern.search(content)
         if not header_match:
             return None
             
+        section_title = header_match.group(1).strip()
         start_idx = header_match.end()
         
         next_section_pattern = re.compile(
@@ -1610,16 +1622,20 @@ def parse_workout_regimen(vault_dir, day_name):
             if line.startswith("-") or line.startswith("*"):
                 ex = re.sub(r"^[-*]\s*", "", line)
                 exercises.append(ex)
+            elif re.match(r"^\d+\.\s+", line):
+                ex = re.sub(r"^\d+\.\s*", "", line)
+                exercises.append(ex)
                 
         if not exercises:
             return None
             
+        name = section_title if isinstance(day_identifier, int) else f"{day_label}'s Split"
         return {
-            "name": f"{day_name}'s Split",
+            "name": name,
             "exercises": exercises
         }
     except Exception as e:
-        print(f"Error parsing Workout_Routine.md: {e}")
+        print(f"Error parsing workout regimen: {e}")
         return None
 
 

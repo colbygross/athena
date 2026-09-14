@@ -14,9 +14,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "life_dashboard.db")
-VAULT_DIR = os.path.join(BASE_DIR, "obsidian_vault")
+import database
+
+BASE_DIR = os.getenv("WORKSPACE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+VAULT_DIR = os.getenv("VAULT_DIR", os.path.join(BASE_DIR, "obsidian_vault"))
 
 # LLM Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -24,9 +25,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi4-mini:latest")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return database.create_new_connection()
 
 def get_open_calendar_slots():
     """Finds 3 non-overlapping 30-min interview slots in the next 7 business days."""

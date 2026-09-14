@@ -142,7 +142,9 @@ def test_process_lead_and_tailoring(monkeypatch):
     }
     
     import career_agent
+    import job_tailor_engine
     monkeypatch.setattr(career_agent, "call_llm", lambda prompt: json.dumps(mock_llm_response))
+    monkeypatch.setattr(job_tailor_engine, "call_llm", lambda prompt: json.dumps(mock_llm_response))
     monkeypatch.setattr(career_agent, "search_web_recruiter", lambda comp: ["Sundar Pichai"])
 
     # 1. Process lead
