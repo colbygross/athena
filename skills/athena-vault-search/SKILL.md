@@ -6,10 +6,10 @@ platforms: [linux]
 
 # Athena Vault Search Skill
 
-Use this skill whenever the user asks about a topic, event, person, company, project, or concept that may exist as a note in the vault. The vault lives at `/home/archer/ATHENA/obsidian_vault/`.
+Use this skill whenever the user asks about a topic, event, person, company, project, or concept that may exist as a note in the vault. The vault lives at `obsidian_vault/`.
 
 This skill answers questions like:
-- "Do I have any notes about NUWC?"
+- "Do I have any notes about Acme Corp?"
 - "What projects am I currently working on?"
 - "Show me everything tagged #high."
 - "What did I write about red-black trees?"
@@ -42,17 +42,17 @@ This skill answers questions like:
 
 Find notes whose filename matches a keyword:
 ```bash
-find /home/archer/ATHENA/obsidian_vault -type f -name "*.md" | grep -i "<keyword>"
+find obsidian_vault -type f -name "*.md" | grep -i "<keyword>"
 ```
 
-*Example — find all NUWC-related notes:*
+*Example — find notes by topic:*
 ```bash
-find /home/archer/ATHENA/obsidian_vault -type f -name "*.md" | grep -i "nuwc"
+find obsidian_vault -type f -name "*.md" | grep -i "fastapi"
 ```
 
 *Example — find all notes from a specific date:*
 ```bash
-find /home/archer/ATHENA/obsidian_vault -type f -name "2026-05-23*.md"
+find obsidian_vault -type f -name "2026-05-23*.md"
 ```
 
 ---
@@ -66,17 +66,17 @@ Tags in `tasks.md` and companion notes follow the format `#tagname`. Common tags
 
 Find all notes or tasks carrying a specific tag:
 ```bash
-grep -r "#<tag>" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -r "#<tag>" obsidian_vault --include="*.md" -l
 ```
 
 *Example — find all high-priority tasks:*
 ```bash
-grep -r "#high" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -r "#high" obsidian_vault --include="*.md" -l
 ```
 
 *Example — list all lines tagged #major across the whole vault:*
 ```bash
-grep -rn "#major" /home/archer/ATHENA/obsidian_vault --include="*.md"
+grep -rn "#major" obsidian_vault --include="*.md"
 ```
 
 ---
@@ -85,22 +85,22 @@ grep -rn "#major" /home/archer/ATHENA/obsidian_vault --include="*.md"
 
 Search inside note content for any keyword, phrase, or concept:
 ```bash
-grep -ri "<keyword>" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -ri "<keyword>" obsidian_vault --include="*.md" -l
 ```
 
-*Example — find all notes mentioning "NUWC":*
+*Example — find notes mentioning a specific company or topic:*
 ```bash
-grep -ri "nuwc" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -ri "acme" obsidian_vault --include="*.md" -l
 ```
 
 *Example — find notes mentioning a company name with context lines:*
 ```bash
-grep -ri "naval undersea" /home/archer/ATHENA/obsidian_vault --include="*.md" -B2 -A5
+grep -ri "distributed systems" obsidian_vault --include="*.md" -B2 -A5
 ```
 
 *Example — find notes with a specific frontmatter field value:*
 ```bash
-grep -ri "meta_status: \"applied\"" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -ri "meta_status: \"applied\"" obsidian_vault --include="*.md" -l
 ```
 
 ---
@@ -114,7 +114,7 @@ cat "<absolute_path_to_note>"
 
 *Example:*
 ```bash
-cat /home/archer/ATHENA/obsidian_vault/02_Areas/Career/2026-05-23_nuwc_recruiting_event_flyer_may_30.md
+cat obsidian_vault/02_Areas/Career/2026-06-01_sample_career_flyer.md
 ```
 
 ---
@@ -123,7 +123,7 @@ cat /home/archer/ATHENA/obsidian_vault/02_Areas/Career/2026-05-23_nuwc_recruitin
 
 Companion notes embed `[[WikiLink]]` references. To find all notes that link to a given topic:
 ```bash
-grep -ri "\[\[<topic>\]\]" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -ri "\[\[<topic>\]\]" obsidian_vault --include="*.md" -l
 ```
 
 ---
@@ -132,14 +132,14 @@ grep -ri "\[\[<topic>\]\]" /home/archer/ATHENA/obsidian_vault --include="*.md" -
 
 For broad overview questions, read the auto-generated summaries directly. These are always up to date:
 ```bash
-cat /home/archer/ATHENA/obsidian_vault/Summaries/Financial_Summary.md
-cat /home/archer/ATHENA/obsidian_vault/Summaries/Health_Fitness_Summary.md
-cat /home/archer/ATHENA/obsidian_vault/Summaries/Learning_Career_Summary.md
+cat obsidian_vault/Summaries/Financial_Summary.md
+cat obsidian_vault/Summaries/Health_Fitness_Summary.md
+cat obsidian_vault/Summaries/Learning_Career_Summary.md
 ```
 
 For today's full daily brief:
 ```bash
-cat /home/archer/ATHENA/obsidian_vault/Daily_Briefs/Daily_Brief_$(date +%Y-%m-%d).md
+cat obsidian_vault/Daily_Briefs/Daily_Brief_$(date +%Y-%m-%d).md
 ```
 
 ---
@@ -147,13 +147,13 @@ cat /home/archer/ATHENA/obsidian_vault/Daily_Briefs/Daily_Brief_$(date +%Y-%m-%d
 ### 7. List All Notes in a Category Directory
 
 ```bash
-ls -1t /home/archer/ATHENA/obsidian_vault/02_Areas/<Category>/
-ls -1t /home/archer/ATHENA/obsidian_vault/01_Projects/
+ls -1t obsidian_vault/02_Areas/<Category>/
+ls -1t obsidian_vault/01_Projects/
 ```
 
 *Example — list all career-related notes, newest first:*
 ```bash
-ls -1t /home/archer/ATHENA/obsidian_vault/02_Areas/Career/
+ls -1t obsidian_vault/02_Areas/Career/
 ```
 
 ---

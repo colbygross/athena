@@ -105,7 +105,7 @@ def guess_category_from_filename(filename):
         return "health"
     if any(k in name for k in ["study", "learn", "cs", "algorithm", "tree", "class", "lecture", "book", "paper", "concept"]):
         return "learning"
-    if any(k in name for k in ["career", "resume", "job", "application", "interview", "recruiting", "nuwc", "company", "offer"]):
+    if any(k in name for k in ["career", "resume", "job", "application", "interview", "recruiting", "company", "offer"]):
         return "career"
     return "general"
 

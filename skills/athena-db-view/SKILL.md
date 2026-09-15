@@ -28,13 +28,13 @@ The database contains the following tables:
 
 ## Usage
 
-Use the command-line utility `backend/db_cli.py` inside the project root `/home/archer/ATHENA`.
+Use the command-line utility `backend/db_cli.py` inside the project root ``.
 
 ### 1. List Tables
 
 Check all available tables in the database:
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py list-tables
+python backend/db_cli.py list-tables
 ```
 
 ### 2. Show Table Contents
@@ -42,34 +42,34 @@ cd /home/archer/ATHENA && backend/db_cli.py list-tables
 Display the latest rows in a table (defaults to 20 rows, ordered by date or ID descending). 
 Format is a Markdown table by default:
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py show <table_name> [--limit <number>]
+python backend/db_cli.py show <table_name> [--limit <number>]
 ```
 
 For raw JSON output (preferred for structured parsing by agents):
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py show <table_name> --json [--limit <number>]
+python backend/db_cli.py show <table_name> --json [--limit <number>]
 ```
 
 *Example (Markdown table):*
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py show transactions --limit 5
+python backend/db_cli.py show transactions --limit 5
 ```
 
 *Example (Raw JSON):*
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py show health_logs --limit 3 --json
+python backend/db_cli.py show health_logs --limit 3 --json
 ```
 
 ### 3. Run Custom SQL Query
 
 Run any custom `SELECT` statement:
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT category, SUM(amount) FROM transactions WHERE type='expense' GROUP BY category"
+python backend/db_cli.py query "SELECT category, SUM(amount) FROM transactions WHERE type='expense' GROUP BY category"
 ```
 
 To run a query and output JSON:
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM budgets" --json
+python backend/db_cli.py query "SELECT * FROM budgets" --json
 ```
 
 ## Related Skills

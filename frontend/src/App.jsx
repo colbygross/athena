@@ -618,10 +618,10 @@ function App() {
 
 
   const fileUrl = (relativePath) => {
-    // Relative path fits: 02_Areas/Finances/file.pdf
-    // Returns local workspace path file:/// URI
-    const absoluteBase = "/home/archer/ATHENA/obsidian_vault";
-    return `file://${absoluteBase}/${relativePath}`;
+    if (!relativePath) return "#";
+    if (relativePath.startsWith("http") || relativePath.startsWith("obsidian://")) return relativePath;
+    const cleanPath = relativePath.replace(/^obsidian_vault\//, '');
+    return `obsidian://open?vault=obsidian_vault&file=${encodeURIComponent(cleanPath)}`;
   };
 
   if (loading && !overviewData) {

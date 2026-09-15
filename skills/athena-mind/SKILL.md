@@ -10,18 +10,18 @@ This skill customizes the core philosophies of persistent agent memory (inspired
 
 ## Usage
 
-The utility is driven by `backend/athena_mind.py`. Commands should be run from the project root `/home/archer/ATHENA`.
+The utility is driven by `backend/athena_mind.py`. Commands should be run from the project root ``.
 
 ### 1. Audit Storage Registry
 
 Ensure no information is lost by cross-referencing all files in `storage/` against the Obsidian Vault Markdown notes and the SQLite database:
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py audit-storage
+python backend/athena_mind.py audit-storage
 ```
 
 If orphan or unregistered files are discovered, append the `--fix` flag to automatically create companion frontmatter notes in the appropriate category folders and register the assets inside the SQLite database:
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py audit-storage --fix
+python backend/athena_mind.py audit-storage --fix
 ```
 
 ---
@@ -30,12 +30,12 @@ cd /home/archer/ATHENA && backend/athena_mind.py audit-storage --fix
 
 Scan the vault for plain text mentions of other note titles. It compares names by decreasing length (to prevent partial matches) and inserts `[[Note Title]]` links automatically:
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py find-links
+python backend/athena_mind.py find-links
 ```
 
 To automatically write the link improvements back to the Markdown files in the vault:
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py find-links --fix
+python backend/athena_mind.py find-links --fix
 ```
 
 ---
@@ -44,7 +44,7 @@ cd /home/archer/ATHENA && backend/athena_mind.py find-links --fix
 
 Inspect the vault directories to group notes, detect redundant notes (consolidation candidates), and identify clusters that warrant Directory Map notes (MOCs):
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py analyze-vault
+python backend/athena_mind.py analyze-vault
 ```
 
 ---
@@ -53,7 +53,7 @@ cd /home/archer/ATHENA && backend/athena_mind.py analyze-vault
 
 Run all checks consecutively:
 ```bash
-cd /home/archer/ATHENA && backend/athena_mind.py run-all [--fix]
+python backend/athena_mind.py run-all [--fix]
 ```
 
 ---

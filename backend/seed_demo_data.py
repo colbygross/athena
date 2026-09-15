@@ -238,6 +238,23 @@ def seed_telemetry(db_path: str = None):
     conn.close()
     print("[✓] Successfully seeded ATHENA demo telemetry database!")
 
+def seed_vault(vault_dir: str = None):
+    vault = vault_dir or os.getenv("VAULT_DIR", os.path.join(os.path.dirname(CURRENT_DIR), "obsidian_vault"))
+    if not os.path.exists(vault):
+        return
+    print(f"[*] Checking demo Obsidian vault templates in: {vault}")
+    for root, _, files in os.walk(vault):
+        for f in files:
+            if f.endswith(".sample.md"):
+                target_name = f[:-10] + ".md"
+                target_path = os.path.join(root, target_name)
+                src_path = os.path.join(root, f)
+                if not os.path.exists(target_path):
+                    import shutil
+                    shutil.copy2(src_path, target_path)
+                    print(f"    + Created starter note: {os.path.relpath(target_path, vault)}")
+
 if __name__ == "__main__":
     target_db = sys.argv[1] if len(sys.argv) > 1 else None
     seed_telemetry(target_db)
+    seed_vault()

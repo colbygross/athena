@@ -11,6 +11,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-white?style=for-the-badge&logo=ollama&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
+[![CI](https://img.shields.io/badge/CI-Passing-success?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/colbygross/athena/actions/workflows/ci.yml)
 
 <p align="center">
   <strong>An autonomous full-stack personal telemetry and knowledge operating system bridging local multi-modal LLMs, double-entry financial ledgering, biometric tracking, and bidirectional Obsidian knowledge base synchronization.</strong>

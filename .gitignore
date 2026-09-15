@@ -49,6 +49,8 @@ backend/backups/
 # Personal Notes / Obsidian Vault Markdown Files
 obsidian_vault/**/*.md
 obsidian_vault/*.md
+!obsidian_vault/**/*.sample.md
+!obsidian_vault/*.sample.md
 !obsidian_vault/**/.gitkeep
 !obsidian_vault/.gitkeep
 

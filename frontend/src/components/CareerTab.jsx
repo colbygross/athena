@@ -692,7 +692,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                   <label className="form-label">Master Resume File Path (Optional)</label>
                   <input 
                     type="text" 
-                    placeholder="/home/archer/ATHENA/storage/resume.html" 
+                    placeholder="./storage/sample_resume.html" 
                     className="form-input" 
                     value={profileForm.resume_path} 
                     onChange={e => setProfileForm({ ...profileForm, resume_path: e.target.value })} 

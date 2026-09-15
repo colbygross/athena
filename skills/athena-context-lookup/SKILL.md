@@ -38,16 +38,16 @@ Use this skill before `athena-db-view` or `athena-vault-search` to decide *where
 ### "How am I doing with money / finances?"
 ```bash
 # 1. Recent transactions
-cd /home/archer/ATHENA && backend/db_cli.py show transactions --limit 10
+python backend/db_cli.py show transactions --limit 10
 
 # 2. Spending by category
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' GROUP BY category ORDER BY total DESC"
+python backend/db_cli.py query "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' GROUP BY category ORDER BY total DESC"
 
 # 3. Budget vs. actual
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT b.category, b.limit_amount, COALESCE(SUM(t.amount),0) as spent FROM budgets b LEFT JOIN transactions t ON b.category=t.category AND t.type='expense' GROUP BY b.category"
+python backend/db_cli.py query "SELECT b.category, b.limit_amount, COALESCE(SUM(t.amount),0) as spent FROM budgets b LEFT JOIN transactions t ON b.category=t.category AND t.type='expense' GROUP BY b.category"
 
 # 4. Account balances
-cd /home/archer/ATHENA && backend/db_cli.py show accounts
+python backend/db_cli.py show accounts
 ```
 
 ---
@@ -55,16 +55,16 @@ cd /home/archer/ATHENA && backend/db_cli.py show accounts
 ### "How has my health/fitness been?"
 ```bash
 # 1. Last 7 days of vitals
-cd /home/archer/ATHENA && backend/db_cli.py show health_logs --limit 7
+python backend/db_cli.py show health_logs --limit 7
 
 # 2. Recent workouts
-cd /home/archer/ATHENA && backend/db_cli.py show fitness_logs --limit 5
+python backend/db_cli.py show fitness_logs --limit 5
 
 # 3. Meal logs today
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM meal_logs WHERE date = date('now') ORDER BY id DESC"
+python backend/db_cli.py query "SELECT * FROM meal_logs WHERE date = date('now') ORDER BY id DESC"
 
 # 4. Hydration / energy / stress trends
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT date, water_ml, energy_level, stress_level FROM health_logs ORDER BY date DESC LIMIT 7"
+python backend/db_cli.py query "SELECT date, water_ml, energy_level, stress_level FROM health_logs ORDER BY date DESC LIMIT 7"
 ```
 
 ---
@@ -72,16 +72,16 @@ cd /home/archer/ATHENA && backend/db_cli.py query "SELECT date, water_ml, energy
 ### "What am I learning / studying?"
 ```bash
 # 1. Recent study sessions
-cd /home/archer/ATHENA && backend/db_cli.py show learning_progress --limit 10
+python backend/db_cli.py show learning_progress --limit 10
 
 # 2. Hours by topic/category this week
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT topic, category, SUM(hours_spent) as total_hours FROM learning_progress WHERE date >= date('now', '-7 days') GROUP BY topic"
+python backend/db_cli.py query "SELECT topic, category, SUM(hours_spent) as total_hours FROM learning_progress WHERE date >= date('now', '-7 days') GROUP BY topic"
 
 # 3. In-progress topics
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM learning_progress WHERE status='in-progress'"
+python backend/db_cli.py query "SELECT * FROM learning_progress WHERE status='in-progress'"
 
 # 4. Vault companion notes
-find /home/archer/ATHENA/obsidian_vault/02_Areas/Learning -name "*.md" | xargs ls -lt 2>/dev/null | head -10
+find obsidian_vault/02_Areas/Learning -name "*.md" | xargs ls -lt 2>/dev/null | head -10
 ```
 
 ---
@@ -89,13 +89,13 @@ find /home/archer/ATHENA/obsidian_vault/02_Areas/Learning -name "*.md" | xargs l
 ### "What are my job applications / career status?"
 ```bash
 # 1. All job applications
-cd /home/archer/ATHENA && backend/db_cli.py show job_applications
+python backend/db_cli.py show job_applications
 
 # 2. Active applications only
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT company, role, status, date_applied, notes FROM job_applications WHERE status NOT IN ('rejected','withdrawn') ORDER BY date_applied DESC"
+python backend/db_cli.py query "SELECT company, role, status, date_applied, notes FROM job_applications WHERE status NOT IN ('rejected','withdrawn') ORDER BY date_applied DESC"
 
 # 3. Find companion notes for a company
-grep -ri "<company_name>" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
+grep -ri "<company_name>" obsidian_vault --include="*.md" -l
 ```
 
 ---
@@ -103,19 +103,19 @@ grep -ri "<company_name>" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
 ### "What are my tasks / what do I have to do?"
 ```bash
 # 1. All pending tasks
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, category, priority, importance, due_date FROM tasks WHERE status='pending' ORDER BY due_date ASC, priority DESC"
+python backend/db_cli.py query "SELECT title, category, priority, importance, due_date FROM tasks WHERE status='pending' ORDER BY due_date ASC, priority DESC"
 
 # 2. Overdue tasks
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, category, due_date FROM tasks WHERE status='pending' AND due_date < date('now') ORDER BY due_date ASC"
+python backend/db_cli.py query "SELECT title, category, due_date FROM tasks WHERE status='pending' AND due_date < date('now') ORDER BY due_date ASC"
 
 # 3. Tasks due today
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, category, priority FROM tasks WHERE status='pending' AND due_date = date('now')"
+python backend/db_cli.py query "SELECT title, category, priority FROM tasks WHERE status='pending' AND due_date = date('now')"
 
 # 4. High-importance pending tasks
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, due_date FROM tasks WHERE status='pending' AND importance='major' ORDER BY due_date ASC"
+python backend/db_cli.py query "SELECT title, due_date FROM tasks WHERE status='pending' AND importance='major' ORDER BY due_date ASC"
 
 # 5. Task breakdown by category
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT category, COUNT(*) as count FROM tasks WHERE status='pending' GROUP BY category"
+python backend/db_cli.py query "SELECT category, COUNT(*) as count FROM tasks WHERE status='pending' GROUP BY category"
 ```
 
 ---
@@ -123,10 +123,10 @@ cd /home/archer/ATHENA && backend/db_cli.py query "SELECT category, COUNT(*) as 
 ### "What's on my schedule / calendar?"
 ```bash
 # 1. Upcoming events
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, description, start_time, end_time FROM calendar_events WHERE start_time >= datetime('now') ORDER BY start_time ASC LIMIT 10"
+python backend/db_cli.py query "SELECT title, description, start_time, end_time FROM calendar_events WHERE start_time >= datetime('now') ORDER BY start_time ASC LIMIT 10"
 
 # 2. Events this week
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, start_time FROM calendar_events WHERE start_time BETWEEN datetime('now') AND datetime('now', '+7 days') ORDER BY start_time ASC"
+python backend/db_cli.py query "SELECT title, start_time FROM calendar_events WHERE start_time BETWEEN datetime('now') AND datetime('now', '+7 days') ORDER BY start_time ASC"
 ```
 
 ---
@@ -134,13 +134,13 @@ cd /home/archer/ATHENA && backend/db_cli.py query "SELECT title, start_time FROM
 ### "What habits have I been tracking?"
 ```bash
 # 1. Habit completion for today
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT habit_name, completed, notes FROM habit_logs WHERE date = date('now')"
+python backend/db_cli.py query "SELECT habit_name, completed, notes FROM habit_logs WHERE date = date('now')"
 
 # 2. Completion rate last 7 days
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT habit_name, SUM(completed) as days_completed, COUNT(*) as days_tracked FROM habit_logs WHERE date >= date('now', '-7 days') GROUP BY habit_name"
+python backend/db_cli.py query "SELECT habit_name, SUM(completed) as days_completed, COUNT(*) as days_tracked FROM habit_logs WHERE date >= date('now', '-7 days') GROUP BY habit_name"
 
 # 3. Streak per habit (consecutive days completed)
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT habit_name, completed, date FROM habit_logs ORDER BY habit_name, date DESC LIMIT 30"
+python backend/db_cli.py query "SELECT habit_name, completed, date FROM habit_logs ORDER BY habit_name, date DESC LIMIT 30"
 ```
 
 ---
@@ -148,13 +148,13 @@ cd /home/archer/ATHENA && backend/db_cli.py query "SELECT habit_name, completed,
 ### "What files/documents have I processed?"
 ```bash
 # 1. All processed files
-cd /home/archer/ATHENA && backend/db_cli.py show processed_files --limit 20
+python backend/db_cli.py show processed_files --limit 20
 
 # 2. By category
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT category, COUNT(*) as count FROM processed_files GROUP BY category"
+python backend/db_cli.py query "SELECT category, COUNT(*) as count FROM processed_files GROUP BY category"
 
 # 3. Find a specific document
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM processed_files WHERE original_name LIKE '%<keyword>%'"
+python backend/db_cli.py query "SELECT * FROM processed_files WHERE original_name LIKE '%<keyword>%'"
 ```
 
 ---
@@ -162,8 +162,8 @@ cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM processed_files
 ### "Tell me about [topic/project]"
 1. First search the vault for the topic:
 ```bash
-grep -ri "<topic>" /home/archer/ATHENA/obsidian_vault --include="*.md" -l
-find /home/archer/ATHENA/obsidian_vault -name "*.md" | grep -i "<topic>"
+grep -ri "<topic>" obsidian_vault --include="*.md" -l
+find obsidian_vault -name "*.md" | grep -i "<topic>"
 ```
 2. Read the matching notes with `cat`
 3. Check if it links to a storage file (`meta_storage_relative_path`) → use `athena-file-retrieve`
@@ -175,8 +175,8 @@ find /home/archer/ATHENA/obsidian_vault -name "*.md" | grep -i "<topic>"
 
 Append `--json` to any `db_cli.py show` or `db_cli.py query` command to get structured JSON instead of a Markdown table. This is preferred when the agent is parsing results programmatically:
 ```bash
-cd /home/archer/ATHENA && backend/db_cli.py show transactions --json --limit 5
-cd /home/archer/ATHENA && backend/db_cli.py query "SELECT * FROM tasks WHERE status='pending'" --json
+python backend/db_cli.py show transactions --json --limit 5
+python backend/db_cli.py query "SELECT * FROM tasks WHERE status='pending'" --json
 ```
 
 ---

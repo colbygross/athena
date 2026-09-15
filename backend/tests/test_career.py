@@ -48,7 +48,7 @@ def test_career_profiles_endpoints():
         "name": "Cybersecurity Track",
         "keywords": "SOC Analyst, Network Security",
         "locations": "Boston MA, Remote",
-        "resume_path": "/home/archer/ATHENA/storage/2026-05-23_colby_gross_resume.html",
+        "resume_path": "./storage/sample_resume.html",
         "active": 1
     }
     res = client.post("/api/career/profiles", json=profile)
