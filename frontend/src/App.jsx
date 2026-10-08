@@ -116,6 +116,7 @@ function App() {
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Default to the current month
 
   // Daily Brief States
+  const [dailyBriefsList, setDailyBriefsList] = useState([]);
   const [selectedBrief, setSelectedBrief] = useState(null);
   const [generatingBrief, setGeneratingBrief] = useState(false);
 
@@ -175,8 +176,9 @@ function App() {
       const res = await fetch(`${API_BASE}/daily-briefs/generate`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'success') {
         showToast("Daily brief generated successfully!", "success");
-        await fetch(`${API_BASE}/daily-briefs`);
-        // dailyBriefsList updated in vault
+        const listRes = await fetch(`${API_BASE}/daily-briefs`).then(r => r.json());
+        const briefs = listRes.briefs || [];
+        setDailyBriefsList(briefs);
         if (res.date) {
           fetchAndSelectBrief(res.date);
         }
@@ -467,11 +469,13 @@ function App() {
       }
       
       const briefs = briefListRes.briefs || [];
-      // dailyBriefsList updated in vault
+      setDailyBriefsList(briefs);
       
       if (briefs.length > 0) {
-        const latestDate = briefs[0].date;
-        const res = await fetch(`${API_BASE}/daily-briefs/${latestDate}`).then(r => r.json());
+        const todayStr = formatLocalDate(new Date());
+        const hasTodayBrief = briefs.find(b => b.date === todayStr);
+        const targetDate = hasTodayBrief ? todayStr : briefs[0].date;
+        const res = await fetch(`${API_BASE}/daily-briefs/${targetDate}`).then(r => r.json());
         setSelectedBrief(res);
       } else {
         setSelectedBrief(null);
@@ -775,6 +779,8 @@ function App() {
         {activeTab === 'daily-briefs' && (
           <BriefPanel
             selectedBrief={selectedBrief}
+            briefsList={dailyBriefsList}
+            onSelectBrief={fetchAndSelectBrief}
             generatingBrief={generatingBrief}
             handleGenerateBrief={handleGenerateBrief}
           />

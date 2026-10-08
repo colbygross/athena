@@ -665,7 +665,7 @@ function RenderBrief({ content }) {
   );
 }
 
-function BriefPanel({ selectedBrief, generatingBrief, handleGenerateBrief }) {
+function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingBrief, handleGenerateBrief }) {
   return (
     <div>
       <header className="page-header" style={{ marginBottom: '1.5rem' }}>
@@ -674,14 +674,39 @@ function BriefPanel({ selectedBrief, generatingBrief, handleGenerateBrief }) {
             <h1 className="page-title text-gradient-cyan glitch-text">Daily Brief</h1>
             <p className="page-subtitle">Intelligence Log: Diurnal Recaps</p>
           </div>
-          <button 
-            className="btn-primary" 
-            onClick={handleGenerateBrief} 
-            disabled={generatingBrief}
-            style={{ fontSize: '0.8rem', padding: '0.5rem 1.25rem', height: 'fit-content' }}
-          >
-            {generatingBrief ? '⚡ Generating...' : '⚡ Generate Brief'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {briefsList.length > 0 && (
+              <select
+                className="form-input"
+                value={selectedBrief?.date || ''}
+                onChange={(e) => onSelectBrief && onSelectBrief(e.target.value)}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '0.45rem 0.85rem',
+                  fontFamily: 'var(--font-mono)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-cyan)',
+                  borderRadius: 'var(--border-radius)',
+                  cursor: 'pointer'
+                }}
+              >
+                {briefsList.map(b => (
+                  <option key={b.date} value={b.date}>
+                    {b.date}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button 
+              className="btn-primary" 
+              onClick={handleGenerateBrief} 
+              disabled={generatingBrief}
+              style={{ fontSize: '0.8rem', padding: '0.5rem 1.25rem', height: 'fit-content' }}
+            >
+              {generatingBrief ? '⚡ Generating...' : '⚡ Generate Brief'}
+            </button>
+          </div>
         </div>
       </header>
 
