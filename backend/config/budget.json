@@ -1,0 +1,11 @@
+{
+  "_comment": "Static monthly budget shown on the Finances page. Edit amounts or add/remove categories, then refresh the page. Category names must match transaction categories (food, utilities, subscription, academic, rent, other, ...).",
+  "budgets": [
+    { "category": "rent", "limit_amount": 1200 },
+    { "category": "food", "limit_amount": 400 },
+    { "category": "utilities", "limit_amount": 150 },
+    { "category": "subscription", "limit_amount": 50 },
+    { "category": "academic", "limit_amount": 100 },
+    { "category": "other", "limit_amount": 150 }
+  ]
+}

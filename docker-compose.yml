@@ -1,15 +1,15 @@
-version: "3.8"
-
 services:
   athena:
+    container_name: athena-prod
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
-      - ./backend/life_dashboard.db:/app/backend/life_dashboard.db
+      - ./backend:/app/backend
+      - ./frontend/dist:/app/frontend/dist
       - ./obsidian_vault:/app/obsidian_vault
       - ./storage:/app/storage
     environment:

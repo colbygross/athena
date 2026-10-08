@@ -54,8 +54,8 @@ ATHENA/
 │   ├── db_cli.py               # Custom DB command-line management tool
 │   ├── seed_demo_data.py       # Turnkey synthetic telemetry generator
 │   ├── run_inbox.py            # Inbox multi-modal document pipeline
-│   ├── run_daily_brief.py      # Morning brief generation cron
-│   ├── run_nightly.py          # Nightly retrospective compiler
+│   ├── run_daily_brief.py      # Manual / on-demand daily brief generator
+│   ├── run_nightly.py          # 3-step nightly pipeline (archive, task GC/reset, tomorrow's brief)
 │   └── run_summaries.py        # Periodic rolling summaries generator
 ├── docs/                       # Technical architecture documentation (this folder)
 ├── frontend/                   # Vite + React Client Dashboard

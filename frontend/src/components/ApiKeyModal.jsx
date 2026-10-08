@@ -61,7 +61,7 @@ function ApiKeyModal({ show, onClose, apiKeyInput, setApiKeyInput, showToast }) 
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
               style={{
-                backgroundColor: '#000000',
+                backgroundColor: 'var(--bg-surface)',
                 border: '1px solid var(--accent-pink)',
                 color: 'var(--text-primary)',
                 padding: '0.75rem',

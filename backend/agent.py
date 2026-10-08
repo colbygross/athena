@@ -1263,18 +1263,32 @@ def sync_local_ics_to_db():
     finally:
         conn.close()
 
-def sync_google_calendar():
+GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar']
+
+def get_google_calendar_service():
+    """
+    Authenticate and return Google Calendar API service instance if available.
+    """
     creds = None
-    token_path = os.path.join(BASE_DIR, 'token.json')
-    creds_path = os.path.join(BASE_DIR, 'credentials.json')
-    
-    SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+    token_candidates = [
+        os.path.join(STORAGE_DIR, 'token.json'),
+        os.path.join(BASE_DIR, 'storage', 'token.json'),
+        os.path.join(BASE_DIR, 'token.json')
+    ]
+    token_path = next((p for p in token_candidates if os.path.exists(p)), token_candidates[0])
+
+    creds_candidates = [
+        os.path.join(STORAGE_DIR, 'credentials.json'),
+        os.path.join(BASE_DIR, 'storage', 'credentials.json'),
+        os.path.join(BASE_DIR, 'credentials.json')
+    ]
+    creds_path = next((p for p in creds_candidates if os.path.exists(p)), creds_candidates[0])
     
     if os.path.exists(token_path):
         try:
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+            creds = Credentials.from_authorized_user_file(token_path, GOOGLE_CALENDAR_SCOPES)
         except Exception as e:
-            print(f"Error loading token.json: {e}")
+            print(f"Error loading {token_path}: {e}")
             
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -1286,22 +1300,100 @@ def sync_google_calendar():
         else:
             if os.path.exists(creds_path):
                 try:
-                    flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
+                    flow = InstalledAppFlow.from_client_secrets_file(creds_path, GOOGLE_CALENDAR_SCOPES)
                     creds = flow.run_local_server(port=0)
                     with open(token_path, 'w') as token:
                         token.write(creds.to_json())
                 except Exception as e:
                     print(f"Google Calendar OAuth flow failed: {e}. Skipping Google Calendar sync.")
-                    return []
+                    return None
             else:
-                print("credentials.json not found. Skipping Google Calendar sync.")
-                return []
+                return None
                 
     if not creds:
-        return []
+        return None
         
     try:
-        service = build('calendar', 'v3', credentials=creds)
+        return build('calendar', 'v3', credentials=creds)
+    except Exception as e:
+        print(f"Error building Google Calendar service: {e}")
+        return None
+
+def push_event_to_google(title, description, start_time, end_time):
+    """
+    Push a new event to Google Calendar. Returns google event id if successful, else None.
+    """
+    service = get_google_calendar_service()
+    if not service:
+        return None
+    try:
+        def to_iso(t_str):
+            s = t_str.strip().replace(" ", "T")
+            if len(s) == 16: # YYYY-MM-DDTHH:MM
+                s += ":00"
+            return s
+
+        event_body = {
+            'summary': title,
+            'description': description or '',
+            'start': {'dateTime': to_iso(start_time), 'timeZone': 'UTC'},
+            'end': {'dateTime': to_iso(end_time), 'timeZone': 'UTC'}
+        }
+        created = service.events().insert(calendarId='primary', body=event_body).execute()
+        return created.get('id')
+    except Exception as e:
+        print(f"Error pushing event to Google Calendar: {e}")
+        return None
+
+def update_event_in_google(event_uid, title, description, start_time, end_time):
+    """
+    Update an existing event in Google Calendar.
+    """
+    if not event_uid or '@local' in event_uid:
+        return False
+    service = get_google_calendar_service()
+    if not service:
+        return False
+    try:
+        def to_iso(t_str):
+            s = t_str.strip().replace(" ", "T")
+            if len(s) == 16:
+                s += ":00"
+            return s
+
+        event_body = {
+            'summary': title,
+            'description': description or '',
+            'start': {'dateTime': to_iso(start_time), 'timeZone': 'UTC'},
+            'end': {'dateTime': to_iso(end_time), 'timeZone': 'UTC'}
+        }
+        service.events().patch(calendarId='primary', eventId=event_uid, body=event_body).execute()
+        return True
+    except Exception as e:
+        print(f"Error updating event in Google Calendar: {e}")
+        return False
+
+def delete_event_from_google(event_uid):
+    """
+    Delete an event from Google Calendar if event_uid belongs to Google.
+    """
+    if not event_uid or '@local' in event_uid:
+        return False
+    service = get_google_calendar_service()
+    if not service:
+        return False
+    try:
+        service.events().delete(calendarId='primary', eventId=event_uid).execute()
+        return True
+    except Exception as e:
+        print(f"Error deleting event from Google Calendar: {e}")
+        return False
+
+def sync_google_calendar():
+    service = get_google_calendar_service()
+    if not service:
+        return []
+    try:
         time_min = (datetime.utcnow() - timedelta(days=30)).isoformat() + 'Z'
         time_max = (datetime.utcnow() + timedelta(days=60)).isoformat() + 'Z'
         
@@ -1320,6 +1412,7 @@ def sync_google_calendar():
 
 def sync_google_calendar_to_db():
     google_events = sync_google_calendar()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if not google_events:
         return
         
@@ -1327,14 +1420,6 @@ def sync_google_calendar_to_db():
     cursor = conn.cursor()
     
     try:
-        # Clear upcoming/recent Google events
-        time_min = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
-        time_max = (datetime.utcnow() + timedelta(days=60)).strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute(
-            "DELETE FROM calendar_events WHERE source = 'google' AND start_time >= ? AND start_time <= ?",
-            (time_min, time_max)
-        )
-        
         count = 0
         for ev in google_events:
             title = ev.get('summary', 'No Title')
@@ -1361,12 +1446,20 @@ def sync_google_calendar_to_db():
             start_str = clean_iso(start_time)
             end_str = clean_iso(end_time) if end_time else start_str
             
-            cursor.execute(
-                """INSERT OR REPLACE INTO calendar_events 
-                   (title, description, start_time, end_time, source, event_uid) 
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (title, description, start_str, end_str, "google", ev['id'])
-            )
+            cursor.execute("SELECT id, tags, color FROM calendar_events WHERE event_uid = ?", (ev['id'],))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute("""
+                    UPDATE calendar_events
+                    SET title = ?, description = ?, start_time = ?, end_time = ?, synced_at = ?
+                    WHERE id = ?
+                """, (title, description, start_str, end_str, now_str, existing['id']))
+            else:
+                cursor.execute("""
+                    INSERT INTO calendar_events 
+                    (title, description, start_time, end_time, source, event_uid, tags, color, synced_at) 
+                    VALUES (?, ?, ?, ?, 'google', ?, '[]', '#4facfe', ?)
+                """, (title, description, start_str, end_str, ev['id'], now_str))
             count += 1
             
         conn.commit()
@@ -1376,6 +1469,100 @@ def sync_google_calendar_to_db():
         print(f"Error syncing Google Calendar to database: {e}")
     finally:
         conn.close()
+
+def archive_and_reset_tasks_nightly(target_date=None):
+    """
+    Executes in nightly pipeline:
+    1. One-off completed tasks are purged from SQLite tasks table (after being recorded in Daily Summary)
+    2. Recurring tasks (daily, weekly, monthly) are reset to pending and their subtasks unchecked
+    3. tasks.md is refreshed
+    """
+    if target_date:
+        today_dt = datetime.strptime(target_date, "%Y-%m-%d")
+        today_str = target_date
+    else:
+        today_dt = datetime.now()
+        today_str = today_dt.strftime("%Y-%m-%d")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Purge one-off completed tasks
+        cursor.execute("""
+            DELETE FROM tasks
+            WHERE status = 'completed' AND (recurrence IS NULL OR recurrence = 'none' OR recurrence = '')
+        """)
+        purged = cursor.rowcount
+        cursor.execute("""
+            DELETE FROM task_subtasks
+            WHERE task_id NOT IN (SELECT id FROM tasks)
+        """)
+        print(f"Purged {purged} completed one-off tasks from database.")
+
+        # Reset daily recurring tasks
+        cursor.execute("SELECT id FROM tasks WHERE recurrence = 'daily'")
+        daily_tasks = cursor.fetchall()
+        for t in daily_tasks:
+            cursor.execute("""
+                UPDATE tasks
+                SET status = 'pending', completed_at = NULL, last_reset_date = ?
+                WHERE id = ?
+            """, (today_str, t['id']))
+            cursor.execute("UPDATE task_subtasks SET is_completed = 0 WHERE task_id = ?", (t['id'],))
+
+        # Reset weekly recurring tasks (on Monday or >= 7 days)
+        is_monday = today_dt.weekday() == 0
+        cursor.execute("SELECT id, last_reset_date FROM tasks WHERE recurrence = 'weekly'")
+        weekly_tasks = cursor.fetchall()
+        for t in weekly_tasks:
+            should_reset = is_monday
+            if not should_reset and t['last_reset_date']:
+                try:
+                    last_dt = datetime.strptime(t['last_reset_date'], "%Y-%m-%d")
+                    if (today_dt - last_dt).days >= 7:
+                        should_reset = True
+                except Exception:
+                    pass
+            if should_reset:
+                cursor.execute("""
+                    UPDATE tasks
+                    SET status = 'pending', completed_at = NULL, last_reset_date = ?
+                    WHERE id = ?
+                """, (today_str, t['id']))
+                cursor.execute("UPDATE task_subtasks SET is_completed = 0 WHERE task_id = ?", (t['id'],))
+
+        # Reset monthly recurring tasks (on 1st of month or new month)
+        is_first_of_month = today_dt.day == 1
+        cursor.execute("SELECT id, last_reset_date FROM tasks WHERE recurrence = 'monthly'")
+        monthly_tasks = cursor.fetchall()
+        for t in monthly_tasks:
+            should_reset = is_first_of_month
+            if not should_reset and t['last_reset_date']:
+                try:
+                    last_dt = datetime.strptime(t['last_reset_date'], "%Y-%m-%d")
+                    if last_dt.month != today_dt.month or last_dt.year != today_dt.year:
+                        should_reset = True
+                except Exception:
+                    pass
+            if should_reset:
+                cursor.execute("""
+                    UPDATE tasks
+                    SET status = 'pending', completed_at = NULL, last_reset_date = ?
+                    WHERE id = ?
+                """, (today_str, t['id']))
+                cursor.execute("UPDATE task_subtasks SET is_completed = 0 WHERE task_id = ?", (t['id'],))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in archive_and_reset_tasks_nightly: {e}")
+    finally:
+        conn.close()
+
+    try:
+        sync_db_to_tasks_md_helper()
+    except Exception as e:
+        print(f"Error updating tasks.md after reset: {e}")
 
 def scan_vault_for_tasks():
     task_pattern = re.compile(r'^\s*-\s*\[([ xX])\]\s*(.+)$')
@@ -1639,93 +1826,67 @@ def parse_workout_regimen(vault_dir, day_identifier):
         return None
 
 
-def generate_daily_brief():
+def generate_daily_brief(target_date=None):
     os.makedirs(os.path.join(VAULT_DIR, "Daily_Briefs"), exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    today_start = f"{today} 04:00:00"
-    today_end = f"{tomorrow} 03:59:59"
-    
+    if target_date is None:
+        target_date = datetime.now().strftime("%Y-%m-%d")
+
+    target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+    target_start = f"{target_date} 00:00:00"
+    target_end = f"{target_date} 23:59:59"
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     try:
-        # Today's events
+        # Schedule / Events
         cursor.execute("""
             SELECT * FROM calendar_events 
             WHERE (start_time >= ? AND start_time <= ?) OR (start_time <= ? AND end_time >= ?)
             ORDER BY start_time ASC
-        """, (today_start, today_end, today_start, today_start))
+        """, (target_start, target_end, target_start, target_start))
         events = cursor.fetchall()
-        
-        # Tasks due today (still pending)
+
+        # Tasks due on target_date (still pending)
         cursor.execute("""
             SELECT * FROM tasks 
             WHERE status = 'pending' AND due_date = ?
-        """, (today,))
+            ORDER BY priority DESC, id ASC
+        """, (target_date,))
         due_tasks = cursor.fetchall()
-        
-        # Tasks completed today
-        cursor.execute("""
-            SELECT * FROM tasks 
-            WHERE status = 'completed' AND completed_at >= ? AND completed_at <= ?
-        """, (today_start, today_end))
-        completed_today = cursor.fetchall()
-        
-        # Overdue / pushed-off tasks (pending with a due_date before today)
+
+        # Overdue / pushed-off tasks (pending with a due_date before target_date)
         cursor.execute("""
             SELECT * FROM tasks 
             WHERE status = 'pending' AND due_date IS NOT NULL AND due_date != '' AND due_date < ?
             ORDER BY due_date ASC
-        """, (today,))
+        """, (target_date,))
         overdue_tasks = cursor.fetchall()
-        
+
         # Other pending tasks (no due date or future due date)
         cursor.execute("""
             SELECT * FROM tasks 
             WHERE status = 'pending' AND (due_date IS NULL OR due_date = '' OR due_date > ?)
             ORDER BY due_date ASC, category ASC LIMIT 10
-        """, (today,))
+        """, (target_date,))
         upcoming_tasks = cursor.fetchall()
-        
-        # Today's habits
-        cursor.execute("""
-            SELECT * FROM habit_logs 
-            WHERE date = ?
-            ORDER BY habit_name ASC
-        """, (today,))
-        todays_habits = cursor.fetchall()
-        
-        # Yesterday's accomplishments
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        yesterday_start = f"{yesterday} 04:00:00"
-        yesterday_end = f"{today} 03:59:59"
-        
-        cursor.execute("""
-            SELECT * FROM tasks 
-            WHERE status = 'completed' AND completed_at >= ? AND completed_at <= ?
-        """, (yesterday_start, yesterday_end))
-        completed_yesterday = cursor.fetchall()
-        
-        cursor.execute("""
-            SELECT * FROM fitness_logs 
-            WHERE date = ?
-        """, (yesterday,))
-        fitness_yesterday = cursor.fetchall()
-        
-        cursor.execute("""
-            SELECT * FROM health_logs 
-            WHERE date = ?
-        """, (yesterday,))
-        health_yesterday = cursor.fetchone()
-        
+
+        # Workout Routine for target_date
+        day_name = target_dt.strftime("%A")
+        current_routine = parse_workout_regimen(VAULT_DIR, day_name)
+        if not current_routine:
+            current_routine = {
+                "name": f"{day_name} (Fallback)",
+                "exercises": ["Refer to Workout_Routine.md for today's session."]
+            }
+
         # --- Build the brief ---
         brief = []
-        brief.append(f"# Daily Brief — {today}\n")
+        brief.append(f"# Daily Brief — {target_date}\n")
         brief.append(f"> Generated by Athena at {datetime.now().strftime('%H:%M:%S')}\n")
-        
+
         # Today's Schedule
-        brief.append("## 📅 Today's Schedule")
+        brief.append("## 📅 Schedule")
         if events:
             for ev in events:
                 time_str = ev['start_time'].split(' ')[1][:5] if ' ' in ev['start_time'] else "All Day"
@@ -1733,122 +1894,50 @@ def generate_daily_brief():
                 brief.append(f"- **{time_str}** ({src}): {ev['title']} — *{ev['description'] or 'No description'}*")
         else:
             brief.append("- No events scheduled for today.")
-            
-        # Tasks Completed Today
-        brief.append(f"\n## ✅ Completed Today ({len(completed_today)})")
-        if completed_today:
-            for t in completed_today:
-                completed_time = ""
-                if t['completed_at']:
-                    try:
-                        completed_time = f" at {t['completed_at'].split(' ')[1][:5]}"
-                    except (IndexError, AttributeError):
-                        pass
-                brief.append(f"- [x] {t['title']} ({t['category']}){completed_time}")
-        else:
-            brief.append("- Nothing checked off yet today.")
-            
-        # Tasks Still Due Today
-        brief.append(f"\n## 🎯 Still Due Today ({len(due_tasks)})")
+
+        # Tasks Due Today
+        brief.append(f"\n## 🎯 Tasks Due Today ({len(due_tasks)})")
         if due_tasks:
             for t in due_tasks:
-                brief.append(f"- [ ] {t['title']} ({t['category']})")
+                cat = f" ({t['category']})" if t['category'] else ""
+                brief.append(f"- [ ] {t['title']}{cat}")
         else:
-            brief.append("- All clear — no outstanding tasks due today.")
-            
+            brief.append("- All clear — no tasks due today.")
+
         # Overdue / Pushed Off
         brief.append(f"\n## ⚠️ Overdue / Pushed Off ({len(overdue_tasks)})")
         if overdue_tasks:
             for t in overdue_tasks:
+                cat = f" ({t['category']})" if t['category'] else ""
                 try:
                     due_dt = datetime.strptime(t['due_date'], "%Y-%m-%d")
-                    days_late = (datetime.strptime(today, "%Y-%m-%d") - due_dt).days
-                    brief.append(f"- [ ] {t['title']} ({t['category']}) — was due {t['due_date']} ({days_late}d overdue)")
+                    days_late = (target_dt - due_dt).days
+                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date']} ({days_late}d overdue)")
                 except (ValueError, TypeError):
-                    brief.append(f"- [ ] {t['title']} ({t['category']}) — was due {t['due_date'] or 'N/A'}")
+                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date'] or 'N/A'}")
         else:
             brief.append("- No overdue tasks. You're on track.")
-            
-        # Today's Habits
-        brief.append(f"\n## 🔄 Habit Checklist")
-        default_habits = ['Code 1 Hour', 'Read 10 pages', 'Workout', 'Drink 3L Water', 'Sleep 8 hours']
-        logged_habits = {h['habit_name']: h['completed'] for h in todays_habits}
-        habits_done = sum(1 for v in logged_habits.values() if v == 1)
-        habits_total = max(len(default_habits), len(logged_habits))
-        brief.append(f"**{habits_done}/{habits_total}** habits completed today.\n")
-        
-        for habit_name in default_habits:
-            if habit_name in logged_habits:
-                check = "x" if logged_habits[habit_name] == 1 else " "
-                brief.append(f"- [{check}] {habit_name}")
-            else:
-                brief.append(f"- [ ] {habit_name} *(not logged)*")
-        # Include any extra tracked habits not in the default list
-        for habit_name, completed in logged_habits.items():
-            if habit_name not in default_habits:
-                check = "x" if completed == 1 else " "
-                brief.append(f"- [{check}] {habit_name}")
-        
-        # Today's Workout Routine
-        try:
-            today_dt = datetime.strptime(today, "%Y-%m-%d")
-        except Exception:
-            today_dt = datetime.now()
-            
-        day_name = today_dt.strftime("%A")  # e.g., 'Monday'
-        
-        # Parse from Workout_Routine.md based on day of week
-        current_routine = parse_workout_regimen(VAULT_DIR, day_name)
-        
-        if not current_routine:
-            print(f"Falling back to default for {day_name}.")
-            current_routine = {
-                "name": f"{day_name} (Fallback)",
-                "exercises": ["Refer to Workout_Routine.md for today's session."]
-            }
-        
-        brief.append(f"\n## 🏋️ Today's Workout Routine")
+
+        # Upcoming Tasks
+        brief.append(f"\n## 📋 Coming Up Next ({len(upcoming_tasks)})")
+        if upcoming_tasks:
+            for t in upcoming_tasks:
+                cat = f" ({t['category']})" if t['category'] else ""
+                due = f" 📅 {t['due_date']}" if t['due_date'] else ""
+                brief.append(f"- [ ] {t['title']}{cat}{due}")
+        else:
+            brief.append("- No upcoming tasks in the queue.")
+
+        # Workout Routine
+        brief.append(f"\n## 🏋️ Workout Routine")
         brief.append(f"**Routine**: {current_routine['name']}")
         brief.append("Reference: [[02_Areas/Fitness/Workout_Routine|Workout Routine]]\n")
         for exercise in current_routine['exercises']:
             brief.append(f"- [ ] {exercise}")
-        
-        # Upcoming Tasks
-        brief.append(f"\n## 📋 Coming Up Next")
-        if upcoming_tasks:
-            for t in upcoming_tasks:
-                due = f" 📅 {t['due_date']}" if t['due_date'] else ""
-                brief.append(f"- [ ] {t['title']} ({t['category']}){due}")
-        else:
-            brief.append("- No upcoming tasks in the queue.")
-            
-        # Yesterday's Review
-        brief.append(f"\n## ↩️ Yesterday's Review ({yesterday})")
-        has_yesterday = False
-        if completed_yesterday:
-            has_yesterday = True
-            brief.append(f"### Completed ({len(completed_yesterday)} tasks)")
-            for t in completed_yesterday:
-                brief.append(f"- [x] {t['title']} ({t['category']})")
-        if fitness_yesterday:
-            has_yesterday = True
-            brief.append("\n### Fitness")
-            for f_log in fitness_yesterday:
-                dist = f" ({f_log['distance_km']} km)" if f_log['distance_km'] else ""
-                brief.append(f"- {f_log['activity_type'].capitalize()} for {f_log['duration_minutes']} mins{dist}")
-        if health_yesterday:
-            has_yesterday = True
-            brief.append("\n### Health")
-            sleep = f"Sleep: {health_yesterday['sleep_hours']}h" if health_yesterday['sleep_hours'] else "Sleep: —"
-            mood = f"Mood: {health_yesterday['mood']}/10" if health_yesterday['mood'] else "Mood: —"
-            brief.append(f"- {sleep} · {mood}")
-            
-        if not has_yesterday:
-            brief.append("- No tracked activity recorded yesterday.")
-            
-        brief_path = os.path.join(VAULT_DIR, "Daily_Briefs", f"Daily_Brief_{today}.md")
+
+        brief_path = os.path.join(VAULT_DIR, "Daily_Briefs", f"Daily_Brief_{target_date}.md")
         write_file_atomically(brief_path, "\n".join(brief) + "\n")
-            
+
         print(f"Generated Daily Brief at {brief_path}")
     except Exception as e:
         print(f"Error generating Daily Brief: {e}")
@@ -1858,17 +1947,16 @@ def generate_daily_brief():
 
 def generate_daily_summary(target_date=None):
     """
-    Generate a comprehensive daily summary for a specific date (defaults to YESTERDAY).
+    Generate a daily summary archive for a specific date (defaults to today).
     Archive it to 04_Archives/, then delete the daily brief for that date.
-    Pulls tasks, events, habits, inbox, fitness, health, finances, learning, and career data.
+    Pulls events, completed tasks, transactions, and the most recent vital log.
     """
     if target_date is None:
-        logical_now = datetime.now() - timedelta(hours=4)
-        target_date = (logical_now - timedelta(days=1)).strftime("%Y-%m-%d")
-        
+        target_date = datetime.now().strftime("%Y-%m-%d")
+
     target_dt = datetime.strptime(target_date, "%Y-%m-%d")
-    target_start = f"{target_date} 04:00:00"
-    target_end = f"{(target_dt + timedelta(days=1)).strftime('%Y-%m-%d')} 03:59:59"
+    target_start = f"{target_date} 00:00:00"
+    target_end = f"{target_date} 23:59:59"
 
     os.makedirs(os.path.join(VAULT_DIR, "04_Archives"), exist_ok=True)
 
@@ -1876,16 +1964,6 @@ def generate_daily_summary(target_date=None):
     cursor = conn.cursor()
 
     try:
-        # ---- TASKS: all tasks active on target_date ----
-        cursor.execute("""
-            SELECT * FROM tasks
-            WHERE (completed_at >= ? AND completed_at <= ?)
-               OR (due_date = ?)
-               OR (created_at >= ? AND created_at <= ?)
-            ORDER BY status DESC, category ASC
-        """, (target_start, target_end, target_date, target_start, target_end))
-        yesterday_tasks = cursor.fetchall()
-        
         # ---- EVENTS ----
         cursor.execute("""
             SELECT * FROM calendar_events 
@@ -1894,37 +1972,33 @@ def generate_daily_summary(target_date=None):
         """, (target_start, target_end, target_start, target_start))
         events = cursor.fetchall()
 
-        # ---- HABITS ----
-        cursor.execute("SELECT * FROM habit_logs WHERE date = ? ORDER BY habit_name ASC", (target_date,))
-        yesterday_habits = cursor.fetchall()
-
-        # ---- INBOX processed files ----
+        # ---- COMPLETED TASKS ----
         cursor.execute("""
-            SELECT * FROM processed_files
-            WHERE processed_at >= ? AND processed_at <= ?
-            ORDER BY processed_at ASC
-        """, (target_start, target_end))
-        inbox_processed = cursor.fetchall()
+            SELECT * FROM tasks
+            WHERE status = 'completed' AND (
+                (completed_at >= ? AND completed_at <= ?)
+                OR completed_at LIKE ?
+            )
+            ORDER BY completed_at ASC
+        """, (target_start, target_end, f"{target_date}%"))
+        completed_tasks = cursor.fetchall()
 
-        # ---- FITNESS ----
-        cursor.execute("SELECT * FROM fitness_logs WHERE date = ?", (target_date,))
-        fitness_yesterday = cursor.fetchall()
+        # ---- TRANSACTIONS ----
+        cursor.execute("""
+            SELECT * FROM transactions 
+            WHERE date = ? 
+            ORDER BY id ASC
+        """, (target_date,))
+        transactions = cursor.fetchall()
 
-        # ---- HEALTH ----
-        cursor.execute("SELECT * FROM health_logs WHERE date = ?", (target_date,))
-        health_yesterday = cursor.fetchone()
-
-        # ---- FINANCES ----
-        cursor.execute("SELECT * FROM transactions WHERE date = ?", (target_date,))
-        transactions_yesterday = cursor.fetchall()
-
-        # ---- LEARNING ----
-        cursor.execute("SELECT * FROM learning_progress WHERE date = ?", (target_date,))
-        learning_yesterday = cursor.fetchall()
-
-        # ---- CAREER ----
-        cursor.execute("SELECT * FROM job_applications WHERE date_applied = ?", (target_date,))
-        career_yesterday = cursor.fetchall()
+        # ---- MOST RECENT VITAL LOG ----
+        cursor.execute("""
+            SELECT * FROM health_logs 
+            WHERE date <= ? 
+            ORDER BY date DESC, id DESC 
+            LIMIT 1
+        """, (target_date,))
+        vital_log = cursor.fetchone()
 
         # ---- BUILD THE SUMMARY ----
         lines = []
@@ -1939,33 +2013,6 @@ def generate_daily_summary(target_date=None):
         lines.append(f"> Archived by Athena at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
 
-        # --- Tasks ---
-        completed = [t for t in yesterday_tasks if t['status'] == 'completed' and t['completed_at'] and target_start <= t['completed_at'] <= target_end]
-        pending = [t for t in yesterday_tasks if t['status'] == 'pending' and t['due_date'] == target_date]
-        total_tasks = len(completed) + len(pending)
-
-        lines.append(f"## 📋 Tasks ({total_tasks} total — {len(completed)} done, {len(pending)} left)")
-        lines.append("")
-
-        if completed:
-            lines.append("### ✅ Completed")
-            for t in completed:
-                cat = t['category'] or 'general'
-                lines.append(f"- [x] {t['title']} ({cat})")
-            lines.append("")
-
-        if pending:
-            lines.append("### ❌ Not Completed")
-            for t in pending:
-                cat = t['category'] or 'general'
-                due = f" 📅 {t['due_date']}" if t['due_date'] else ""
-                lines.append(f"- [ ] {t['title']} ({cat}){due}")
-            lines.append("")
-
-        if not completed and not pending:
-            lines.append("- No task activity recorded.")
-            lines.append("")
-
         # --- Events ---
         lines.append("## 📅 Events")
         lines.append("")
@@ -1978,114 +2025,69 @@ def generate_daily_summary(target_date=None):
             lines.append("- No events scheduled or recorded.")
         lines.append("")
 
-        # --- Habits ---
-        habits_done = sum(1 for h in yesterday_habits if h['completed'] == 1)
-        habits_total = len(yesterday_habits)
-        lines.append(f"## 🔄 Habits ({habits_done}/{habits_total} completed)")
+        # --- Completed Tasks ---
+        lines.append(f"## ✅ Completed Tasks ({len(completed_tasks)})")
         lines.append("")
-
-        if yesterday_habits:
-            default_habits = ['Code 1 Hour', 'Read 10 pages', 'Workout', 'Drink 3L Water', 'Sleep 8 hours']
-            logged_names = {h['habit_name']: h['completed'] for h in yesterday_habits}
-            for habit_name in default_habits:
-                comp = logged_names.get(habit_name)
-                if comp is not None:
-                    check = "x" if comp == 1 else " "
-                    lines.append(f"- [{check}] {habit_name}")
-                else:
-                    lines.append(f"- [ ] {habit_name} *(not logged)*")
-            for h in yesterday_habits:
-                if h['habit_name'] not in default_habits:
-                    check = "x" if h['completed'] == 1 else " "
-                    lines.append(f"- [{check}] {h['habit_name']}")
+        if completed_tasks:
+            for t in completed_tasks:
+                cat = t['category'] or 'general'
+                completed_time = ""
+                if t['completed_at']:
+                    try:
+                        completed_time = f" at {t['completed_at'].split(' ')[1][:5]}"
+                    except (IndexError, AttributeError):
+                        pass
+                lines.append(f"- [x] {t['title']} ({cat}){completed_time}")
         else:
-            lines.append("- No habits logged.")
+            lines.append("- No completed tasks recorded.")
         lines.append("")
 
-        # --- Inbox Activity ---
-        lines.append(f"## 📥 Inbox Processing ({len(inbox_processed)} files)")
+        # --- Transactions ---
+        lines.append("## 💰 Transactions")
         lines.append("")
-        if inbox_processed:
-            for f in inbox_processed:
-                lines.append(f"- **{f['original_name']}** → {f['category']} ({f['description'] or 'no description'})")
-        else:
-            lines.append("- No files processed from inbox.")
-        lines.append("")
-
-        # --- Fitness ---
-        lines.append("## 🏃 Fitness")
-        lines.append("")
-        if fitness_yesterday:
-            for w in fitness_yesterday:
-                dist = f" — {w['distance_km']} km" if w['distance_km'] else ""
-                cals = f" — {w['calories_burned']} cal" if w['calories_burned'] else ""
-                lines.append(f"- **{w['activity_type'].capitalize()}**: {w['duration_minutes']} mins{dist}{cals}")
-                if w['notes']:
-                    lines.append(f"  - {w['notes']}")
-        else:
-            lines.append("- No workout logged.")
-        lines.append("")
-
-        # --- Health ---
-        lines.append("## ❤️ Health")
-        lines.append("")
-        if health_yesterday:
-            w = f"- Weight: {health_yesterday['weight_lbs']} lbs" if health_yesterday['weight_lbs'] else ""
-            s = f"- Sleep: {health_yesterday['sleep_hours']} hours" if health_yesterday['sleep_hours'] else ""
-            m = f"- Mood: {health_yesterday['mood']}" if health_yesterday['mood'] else ""
-            bp = ""
-            if health_yesterday['systolic'] and health_yesterday['diastolic']:
-                bp = f"- Blood Pressure: {health_yesterday['systolic']}/{health_yesterday['diastolic']}"
-            lines.append(w) if w else None
-            lines.append(s) if s else None
-            lines.append(m) if m else None
-            lines.append(bp) if bp else None
-            if not any([w, s, m, bp]):
-                lines.append("- No health metrics logged.")
-        else:
-            lines.append("- No health metrics logged.")
-        lines.append("")
-
-        # --- Finances ---
-        lines.append("## 💰 Finances")
-        lines.append("")
-        if transactions_yesterday:
+        if transactions:
             lines.append("| Merchant | Category | Type | Amount |")
             lines.append("| --- | --- | --- | --- |")
-            for tx in transactions_yesterday:
+            for tx in transactions:
                 sign = "+" if tx['type'] == 'income' else "-"
                 lines.append(f"| {tx['merchant'] or 'N/A'} | {tx['category']} | {tx['type']} | {sign}${tx['amount']:.2f} |")
-            total_spent = sum(tx['amount'] for tx in transactions_yesterday if tx['type'] == 'expense')
-            total_income = sum(tx['amount'] for tx in transactions_yesterday if tx['type'] == 'income')
+            total_spent = sum(tx['amount'] for tx in transactions if tx['type'] == 'expense')
+            total_income = sum(tx['amount'] for tx in transactions if tx['type'] == 'income')
             lines.append("")
             lines.append(f"**Total spent:** ${total_spent:.2f}  |  **Total income:** ${total_income:.2f}")
         else:
             lines.append("- No transactions logged.")
         lines.append("")
 
-        # --- Learning ---
-        lines.append("## 📚 Learning")
+        # --- Most Recent Vital Log ---
+        lines.append("## ❤️ Vitals & Health")
         lines.append("")
-        if learning_yesterday:
-            for l in learning_yesterday:
-                status = "✓" if l['status'] == 'completed' else "⏳"
-                lines.append(f"- {status} **{l['topic']}** ({l['category']}) — {l['hours_spent']} hrs")
-                if l['notes']:
-                    lines.append(f"  - {l['notes']}")
-        else:
-            lines.append("- No study sessions logged.")
-        lines.append("")
+        if vital_log:
+            vital_items = []
+            vital_keys = vital_log.keys()
+            if 'weight_lbs' in vital_keys and vital_log['weight_lbs']:
+                vital_items.append(f"- Weight: {vital_log['weight_lbs']} lbs")
+            if 'sleep_hours' in vital_keys and vital_log['sleep_hours']:
+                vital_items.append(f"- Sleep: {vital_log['sleep_hours']} hours")
+            if 'mood' in vital_keys and vital_log['mood']:
+                vital_items.append(f"- Mood: {vital_log['mood']}")
+            if 'systolic' in vital_keys and 'diastolic' in vital_keys and vital_log['systolic'] and vital_log['diastolic']:
+                vital_items.append(f"- Blood Pressure: {vital_log['systolic']}/{vital_log['diastolic']}")
+            if 'water_ml' in vital_keys and vital_log['water_ml']:
+                vital_items.append(f"- Water: {vital_log['water_ml']} ml")
+            if 'energy_level' in vital_keys and vital_log['energy_level']:
+                vital_items.append(f"- Energy: {vital_log['energy_level']}/10")
+            if 'stress_level' in vital_keys and vital_log['stress_level']:
+                vital_items.append(f"- Stress: {vital_log['stress_level']}/10")
 
-        # --- Career ---
-        lines.append("## 💼 Career")
-        lines.append("")
-        if career_yesterday:
-            for j in career_yesterday:
-                lines.append(f"- **{j['company']}** — {j['role']} ({j['status']})")
-                if j['notes']:
-                    lines.append(f"  - {j['notes']}")
+            if vital_items:
+                log_date_note = f" *(Logged on {vital_log['date']})*" if vital_log['date'] != target_date else ""
+                lines.append(f"> Most recent vital log{log_date_note}:\n")
+                lines.extend(vital_items)
+            else:
+                lines.append("- No health vitals recorded in recent log.")
         else:
-            lines.append("- No job applications logged.")
+            lines.append("- No health vitals logged.")
         lines.append("")
 
         # --- Write the summary ---

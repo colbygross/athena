@@ -10,12 +10,13 @@ function FinancesTab({
   filterAccount,
   setFilterAccount,
   filterDateRange,
-  setFilterDateRange
+  setFilterDateRange,
+  setActiveTab
 }) {
   const [showManagePanel, setShowManagePanel] = useState(false);
   const [nlpInput, setNlpInput] = useState('');
   const [nlpLoading, setNlpLoading] = useState(false);
-  
+
   // Tab-specific form states
   const [txForm, setTxForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -32,11 +33,6 @@ function FinancesTab({
     name: '',
     type: 'checking',
     starting_balance: ''
-  });
-  
-  const [budForm, setBudForm] = useState({
-    category: 'food',
-    limit_amount: ''
   });
   
   const [recForm, setRecForm] = useState({
@@ -202,7 +198,7 @@ function FinancesTab({
       </header>
 
       {/* Natural Language AI Transaction Logger (qwen2.5-coder:3b) */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', border: '1px solid rgba(0, 242, 254, 0.4)', background: 'rgba(5, 10, 25, 0.7)' }}>
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', border: '1px solid var(--border-cyan)', background: 'var(--bg-surface)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--accent-cyan)' }}>auto_awesome</span>
           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
@@ -245,7 +241,7 @@ function FinancesTab({
           const isLiability = acc.type === 'credit_card';
           return (
             <div key={acc.id} className="glass-panel" style={{ padding: '1rem 1.25rem', border: isLiability ? '1px solid rgba(255, 0, 127, 0.3)' : '1px solid rgba(0, 242, 254, 0.3)', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: 0, right: 0, background: isLiability ? 'var(--accent-pink)' : 'var(--accent-cyan)', color: '#070a12', fontSize: '0.55rem', padding: '0.1rem 0.35rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ position: 'absolute', top: 0, right: 0, background: isLiability ? 'var(--accent-pink)' : 'var(--accent-cyan)', color: 'var(--bg-space)', fontSize: '0.55rem', padding: '0.1rem 0.35rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
                 {acc.type.toUpperCase()}
               </span>
               <span className="stat-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>{acc.name}</span>
@@ -320,37 +316,26 @@ function FinancesTab({
             </form>
           </div>
 
-          {/* Panel 2: Set Budget */}
+          {/* Panel 2: Static Budget (edit backend/config/budget.json) */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <div className="panel-header" style={{ padding: '0 0 1rem 0', marginBottom: '1rem' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>Category Budget</h3>
+              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>Monthly Budget</h3>
             </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleFormSubmit(
-                'budgets',
-                { ...budForm, limit_amount: parseFloat(budForm.limit_amount) },
-                setBudForm,
-                { category: 'food', limit_amount: '' }
-              );
-            }} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select className="form-select" value={budForm.category} onChange={e => setBudForm({...budForm, category: e.target.value})}>
-                  <option value="food">Food & Groceries</option>
-                  <option value="utilities">Utilities & Bills</option>
-                  <option value="subscription">Subscriptions</option>
-                  <option value="academic">Academic / Learning</option>
-                  <option value="rent">Rent / Living</option>
-                  <option value="other">Other</option>
-                </select>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {financesData.budgets.map(b => (
+                <div key={b.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{b.category}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>${Number(b.limit_amount).toFixed(0)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.5rem' }}>
+                <span>Total</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>${financesData.budgets.reduce((sum, b) => sum + Number(b.limit_amount || 0), 0).toFixed(0)}</span>
               </div>
-              <div className="form-group">
-                <label className="form-label">Monthly Limit ($)</label>
-                <input type="number" step="0.01" placeholder="0.00" className="form-input" value={budForm.limit_amount} onChange={e => setBudForm({...budForm, limit_amount: e.target.value})} required />
-              </div>
-              <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '3.1rem' }}>Set Budget</button>
-            </form>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.65rem', margin: '0.5rem 0 0 0' }}>
+                Static budget. Edit backend/config/budget.json to change.
+              </p>
+            </div>
           </div>
 
           {/* Panel 3: Add Recurring */}
@@ -693,13 +678,13 @@ function FinancesTab({
             
             {/* Custom stacked telemetry bar chart */}
             {financesData.breakdown.length > 0 && (
-              <div style={{ background: '#000000', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
                 <span className="form-label" style={{ fontSize: '0.65rem', marginBottom: '0.5rem', display: 'block' }}>Relative Spending Telemetry</span>
-                <div style={{ display: 'flex', height: '1.5rem', borderRadius: '4px', overflow: 'hidden', background: '#222' }}>
+                <div style={{ display: 'flex', height: '1.5rem', borderRadius: '4px', overflow: 'hidden', background: 'var(--bg-card)' }}>
                   {financesData.breakdown.map((item, idx) => {
                     const totalExpense = financesData.breakdown.reduce((sum, b) => sum + b.total, 0);
                     const pct = totalExpense > 0 ? (item.total / totalExpense) * 100 : 0;
-                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', '#eab308', 'var(--accent-green)', '#ff5722'];
+                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', 'var(--accent-yellow)', 'var(--accent-green)', '#ff5722'];
                     return (
                       <div 
                         key={item.category} 
@@ -711,7 +696,7 @@ function FinancesTab({
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 0.8rem', marginTop: '0.75rem' }}>
                   {financesData.breakdown.map((item, idx) => {
-                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', '#eab308', 'var(--accent-green)', '#ff5722'];
+                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', 'var(--accent-yellow)', 'var(--accent-green)', '#ff5722'];
                     return (
                       <div key={item.category} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem' }}>
                         <span style={{ width: '8px', height: '8px', background: colors[idx % colors.length], borderRadius: '2px' }} />
@@ -727,10 +712,13 @@ function FinancesTab({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <span className="form-label" style={{ fontSize: '0.7rem', borderBottom: '1px dashed var(--border-cyan)', paddingBottom: '0.25rem' }}>Category Budget Meters</span>
               
-              {financesData.breakdown.length === 0 ? (
+              {financesData.breakdown.length === 0 && financesData.budgets.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>No spending recorded for limits.</p>
               ) : (
-                financesData.breakdown.map(item => {
+                [
+                  ...financesData.budgets.map(b => ({ category: b.category, total: (financesData.breakdown.find(x => x.category === b.category) || {}).total || 0 })),
+                  ...financesData.breakdown.filter(x => !financesData.budgets.some(b => b.category === x.category))
+                ].map(item => {
                   const budget = financesData.budgets.find(b => b.category === item.category);
                   const limit = budget ? budget.limit_amount : 0;
                   const pct = limit > 0 ? (item.total / limit) * 100 : 0;
@@ -744,7 +732,7 @@ function FinancesTab({
                           ${item.total.toFixed(2)} {limit > 0 ? `/ $${limit.toFixed(0)}` : '(No limit)'}
                         </span>
                       </div>
-                      <div style={{ height: '0.5rem', background: '#000000', border: '1px solid var(--border-cyan)', borderRadius: '2px', overflow: 'hidden', position: 'relative' }}>
+                      <div style={{ height: '0.5rem', background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', borderRadius: '2px', overflow: 'hidden', position: 'relative' }}>
                         {limit > 0 ? (
                           <div 
                             style={{ 
@@ -756,7 +744,7 @@ function FinancesTab({
                             }} 
                           />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', background: '#222' }} />
+                          <div style={{ width: '100%', height: '100%', background: 'var(--bg-card)' }} />
                         )}
                       </div>
                       {limit > 0 && (
@@ -854,7 +842,7 @@ function FinancesTab({
               
               return (
                 <>
-                  <div style={{ background: '#000000', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>AGGREGATED LIABILITY (EXCLUDED FROM NET WEALTH)</span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.2rem' }}>
                       <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-pink)', fontFamily: 'var(--font-mono)' }}>
@@ -862,7 +850,7 @@ function FinancesTab({
                       </span>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Total Liability</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #222', paddingTop: '0.4rem', marginTop: '0.2rem', fontSize: '0.7rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.4rem', marginTop: '0.2rem', fontSize: '0.7rem' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Principal: <strong style={{ color: 'var(--text-primary)' }}>${totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
                       <span style={{ color: 'var(--text-muted)' }}>Interest: <strong style={{ color: 'var(--text-primary)' }}>${totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
                     </div>
@@ -882,7 +870,7 @@ function FinancesTab({
                           <div key={loan.id} className="list-item" style={{ padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', border: '1px solid rgba(255, 0, 127, 0.15)', borderRadius: '4px', marginBottom: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{loan.name}</span>
-                              <span style={{ fontSize: '0.65rem', background: loan.type === 'subsidized' ? 'var(--accent-cyan)' : 'var(--accent-pink)', color: '#000000', padding: '0.1rem 0.3rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+                              <span style={{ fontSize: '0.65rem', background: loan.type === 'subsidized' ? 'var(--accent-cyan)' : 'var(--accent-pink)', color: 'var(--bg-space)', padding: '0.1rem 0.3rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
                                 {loan.type.toUpperCase()}
                               </span>
                             </div>
@@ -893,7 +881,7 @@ function FinancesTab({
                               </span>
                             </div>
                             {showManagePanel && (
-                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '1px dashed #222', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
                                 <button
                                   className="btn-danger-icon"
                                   onClick={() => deleteStudentLoan(loan.id, loan.name)}

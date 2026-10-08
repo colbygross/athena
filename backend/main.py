@@ -6,10 +6,11 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 import ipaddress
+import json
 from urllib.parse import urlparse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from icalendar import Calendar, Event
 
 from database import get_db_connection, init_db, _db_conn_var, create_new_connection
@@ -113,10 +114,6 @@ class AccountCreate(BaseModel):
     name: str
     type: str
     starting_balance: float = 0.0
-
-class BudgetCreate(BaseModel):
-    category: str
-    limit_amount: float
 
 class RecurringCreate(BaseModel):
     name: str
@@ -391,9 +388,8 @@ def get_finances(account_id: Optional[int] = None, date_range: Optional[str] = N
             elif acc['type'] == 'credit_card':
                 net_wealth -= acc['current_balance']
                 
-        # Fetch all budgets
-        cursor.execute("SELECT * FROM budgets")
-        budgets = [dict(row) for row in cursor.fetchall()]
+        # Static budgets from backend/config/budget.json
+        budgets = load_budgets()
         
         # Fetch active recurring transactions
         cursor.execute("""
@@ -664,34 +660,26 @@ def delete_student_loan(loan_id: int):
 
 
 # --- BUDGETS ---
+# Static monthly budget, edited by hand in backend/config/budget.json
+BUDGET_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "budget.json")
+
+def load_budgets():
+    try:
+        with open(BUDGET_CONFIG_PATH) as f:
+            data = json.load(f)
+        return [
+            {"category": b["category"], "limit_amount": float(b["limit_amount"])}
+            for b in data.get("budgets", [])
+        ]
+    except FileNotFoundError:
+        return []
+
 @app.get("/api/budgets")
 def get_budgets():
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM budgets")
-        return {"budgets": [dict(row) for row in cursor.fetchall()]}
+        return {"budgets": load_budgets()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.post("/api/budgets")
-def set_budget(bud: BudgetCreate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT OR REPLACE INTO budgets (category, limit_amount) VALUES (?, ?)",
-            (bud.category, bud.limit_amount)
-        )
-        conn.commit()
-        return {"status": "success"}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail=f"Invalid budget config: {e}")
 
 # --- RECURRING TRANSACTIONS ---
 @app.get("/api/recurring")
@@ -1430,12 +1418,28 @@ def add_habit_log(log: HabitLogCreate):
         conn.close()
 
 # --- TASKS ---
+class SubtaskCreate(BaseModel):
+    title: str
+
+class SubtaskUpdate(BaseModel):
+    title: Optional[str] = None
+    is_completed: Optional[bool] = None
+
+class PrerequisiteCreate(BaseModel):
+    prerequisite_type: str # 'task' or 'event'
+    prerequisite_id: int
+
 class TaskCreate(BaseModel):
     title: str
     category: str = "general"
     due_date: Optional[str] = None
     priority: str = "medium"
     importance: str = "minor"
+    estimated_minutes: Optional[int] = 30
+    recurrence: str = "none" # 'none', 'daily', 'weekly', 'monthly'
+    event_id: Optional[int] = None
+    subtasks: Optional[List[str]] = None
+    prerequisites: Optional[List[Dict[str, Any]]] = None
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -1444,14 +1448,85 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     priority: Optional[str] = None
     importance: Optional[str] = None
+    estimated_minutes: Optional[int] = None
+    recurrence: Optional[str] = None
+    event_id: Optional[int] = None
+
+def _get_full_task_data(cursor, task_row, now_str):
+    task = dict(task_row)
+    task_id = task['id']
+
+    # Fetch subtasks
+    cursor.execute("SELECT id, task_id, title, is_completed, position FROM task_subtasks WHERE task_id = ? ORDER BY position ASC, id ASC", (task_id,))
+    subtasks = [dict(r) for r in cursor.fetchall()]
+    task['subtasks'] = subtasks
+
+    # Fetch prerequisites
+    cursor.execute("SELECT id, prerequisite_type, prerequisite_id FROM task_prerequisites WHERE task_id = ?", (task_id,))
+    prereqs = cursor.fetchall()
+    
+    prereq_details = []
+    unmet_prereqs = []
+    is_blocked = False
+
+    for p in prereqs:
+        p_type = p['prerequisite_type']
+        p_id = p['prerequisite_id']
+        is_met = True
+        prereq_title = "Unknown"
+
+        if p_type == 'task':
+            cursor.execute("SELECT title, status FROM tasks WHERE id = ?", (p_id,))
+            pt = cursor.fetchone()
+            if pt:
+                prereq_title = pt['title']
+                is_met = (pt['status'] == 'completed')
+            else:
+                is_met = True # Removed/missing task doesn't block
+        elif p_type == 'event':
+            cursor.execute("SELECT title, end_time FROM calendar_events WHERE id = ?", (p_id,))
+            pe = cursor.fetchone()
+            if pe:
+                prereq_title = pe['title']
+                # Met if event has already finished
+                is_met = (pe['end_time'] <= now_str)
+            else:
+                is_met = True
+
+        prereq_details.append({
+            "id": p['id'],
+            "prerequisite_type": p_type,
+            "prerequisite_id": p_id,
+            "title": prereq_title,
+            "is_met": is_met
+        })
+        if not is_met:
+            is_blocked = True
+            unmet_prereqs.append(f"{'Task' if p_type == 'task' else 'Event'}: {prereq_title}")
+
+    task['prerequisites'] = prereq_details
+    task['is_blocked'] = is_blocked
+    task['unmet_prerequisites'] = unmet_prereqs
+
+    # Attached event details if applicable
+    if task.get('event_id'):
+        cursor.execute("SELECT id, title, start_time, end_time FROM calendar_events WHERE id = ?", (task['event_id'],))
+        ev = cursor.fetchone()
+        task['attached_event'] = dict(ev) if ev else None
+    else:
+        task['attached_event'] = None
+
+    return task
 
 @app.get("/api/tasks")
 def get_tasks():
     conn = get_db_connection()
     cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         cursor.execute("SELECT * FROM tasks ORDER BY status DESC, due_date ASC, created_at DESC")
-        tasks = [dict(row) for row in cursor.fetchall()]
+        raw_tasks = cursor.fetchall()
+        tasks = [_get_full_task_data(cursor, row, now_str) for row in raw_tasks]
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1464,11 +1539,45 @@ def add_task(task: TaskCreate):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO tasks (title, category, status, due_date, source_file, priority, importance) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (task.title, task.category, "pending", task.due_date, "tasks.md", task.priority, task.importance)
+            """INSERT INTO tasks 
+               (title, category, status, due_date, source_file, priority, importance, estimated_minutes, recurrence, event_id) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                task.title, 
+                task.category, 
+                "pending", 
+                task.due_date, 
+                "tasks.md", 
+                task.priority or "medium", 
+                task.importance or "minor",
+                task.estimated_minutes if task.estimated_minutes is not None else 30,
+                task.recurrence or "none",
+                task.event_id
+            )
         )
         conn.commit()
         task_id = cursor.lastrowid
+
+        # Insert subtasks if provided
+        if task.subtasks:
+            for idx, sub_title in enumerate(task.subtasks):
+                if sub_title.strip():
+                    cursor.execute(
+                        "INSERT INTO task_subtasks (task_id, title, is_completed, position) VALUES (?, ?, 0, ?)",
+                        (task_id, sub_title.strip(), idx)
+                    )
+
+        # Insert prerequisites if provided
+        if task.prerequisites:
+            for p in task.prerequisites:
+                p_type = p.get('prerequisite_type') or p.get('type')
+                p_id = p.get('prerequisite_id') or p.get('id')
+                if p_type and p_id:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO task_prerequisites (task_id, prerequisite_type, prerequisite_id) VALUES (?, ?, ?)",
+                        (task_id, p_type, int(p_id))
+                    )
+        conn.commit()
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1520,6 +1629,16 @@ def update_task(task_id: int, task_data: TaskUpdate):
         if task_data.importance is not None:
             update_fields.append("importance = ?")
             params.append(task_data.importance)
+        if task_data.estimated_minutes is not None:
+            update_fields.append("estimated_minutes = ?")
+            params.append(task_data.estimated_minutes)
+        if task_data.recurrence is not None:
+            update_fields.append("recurrence = ?")
+            params.append(task_data.recurrence)
+        if task_data.event_id is not None:
+            ev_val = task_data.event_id if task_data.event_id != 0 else None
+            update_fields.append("event_id = ?")
+            params.append(ev_val)
             
         if not update_fields:
             return {"status": "no_change", "id": task_id}
@@ -1573,7 +1692,6 @@ def toggle_task(task_id: int):
     finally:
         conn.close()
         
-    # Write back to file system
     source_file = task['source_file']
     title = task['title']
     
@@ -1615,12 +1733,127 @@ def delete_task(task_id: int):
         
     return {"status": "success"}
 
+# --- SUBTASKS ROUTES ---
+@app.post("/api/tasks/{task_id}/subtasks")
+def add_subtask(task_id: int, subtask: SubtaskCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM tasks WHERE id = ?", (task_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Parent task not found")
+        cursor.execute("SELECT MAX(position) as max_pos FROM task_subtasks WHERE task_id = ?", (task_id,))
+        row = cursor.fetchone()
+        pos = (row['max_pos'] or 0) + 1
+        cursor.execute(
+            "INSERT INTO task_subtasks (task_id, title, is_completed, position) VALUES (?, ?, 0, ?)",
+            (task_id, subtask.title.strip(), pos)
+        )
+        conn.commit()
+        subtask_id = cursor.lastrowid
+        return {"status": "success", "id": subtask_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.put("/api/tasks/{task_id}/subtasks/{subtask_id}")
+def update_subtask(task_id: int, subtask_id: int, subtask: SubtaskUpdate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM task_subtasks WHERE id = ? AND task_id = ?", (subtask_id, task_id))
+        st = cursor.fetchone()
+        if not st:
+            raise HTTPException(status_code=404, detail="Subtask not found")
+        updates = []
+        params = []
+        if subtask.title is not None:
+            updates.append("title = ?")
+            params.append(subtask.title.strip())
+        if subtask.is_completed is not None:
+            updates.append("is_completed = ?")
+            params.append(1 if subtask.is_completed else 0)
+        if updates:
+            params.extend([subtask_id, task_id])
+            cursor.execute(f"UPDATE task_subtasks SET {', '.join(updates)} WHERE id = ? AND task_id = ?", tuple(params))
+            conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/tasks/{task_id}/subtasks/{subtask_id}")
+def delete_subtask(task_id: int, subtask_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM task_subtasks WHERE id = ? AND task_id = ?", (subtask_id, task_id))
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+# --- PREREQUISITES ROUTES ---
+@app.post("/api/tasks/{task_id}/prerequisites")
+def add_prerequisite(task_id: int, prereq: PrerequisiteCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM tasks WHERE id = ?", (task_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Task not found")
+        if prereq.prerequisite_type == 'task' and prereq.prerequisite_id == task_id:
+            raise HTTPException(status_code=400, detail="A task cannot be a prerequisite of itself")
+        cursor.execute(
+            "INSERT OR IGNORE INTO task_prerequisites (task_id, prerequisite_type, prerequisite_id) VALUES (?, ?, ?)",
+            (task_id, prereq.prerequisite_type, prereq.prerequisite_id)
+        )
+        conn.commit()
+        return {"status": "success", "id": cursor.lastrowid}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/tasks/{task_id}/prerequisites/{prereq_id}")
+def delete_prerequisite(task_id: int, prereq_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM task_prerequisites WHERE id = ? AND task_id = ?", (prereq_id, task_id))
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 # --- CALENDAR ---
 class CalendarEventCreate(BaseModel):
     title: str
     description: Optional[str] = None
     start_time: str
     end_time: str
+    tags: Optional[List[str]] = []
+    color: Optional[str] = "#4facfe"
+    sync_to_google: Optional[bool] = True
+
+class CalendarEventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    tags: Optional[List[str]] = None
+    color: Optional[str] = None
 
 @app.get("/api/calendar")
 def get_calendar():
@@ -1633,7 +1866,19 @@ def get_calendar():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT * FROM calendar_events ORDER BY start_time ASC")
-        events = [dict(row) for row in cursor.fetchall()]
+        raw_events = cursor.fetchall()
+        events = []
+        for row in raw_events:
+            ev = dict(row)
+            # Parse tags
+            try:
+                ev['tags'] = json.loads(ev['tags']) if ev.get('tags') else []
+            except Exception:
+                ev['tags'] = []
+            # Attached tasks
+            cursor.execute("SELECT id, title, status, priority, estimated_minutes FROM tasks WHERE event_id = ?", (ev['id'],))
+            ev['attached_tasks'] = [dict(t) for t in cursor.fetchall()]
+            events.append(ev)
         return {"events": events}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1644,13 +1889,30 @@ def get_calendar():
 def add_calendar_event(event: CalendarEventCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
+    tags_json = json.dumps(event.tags or [])
+    color = event.color or "#4facfe"
+    
+    # Check if we should push to Google Calendar
     event_uid = f"{uuid.uuid4()}@local"
+    source = "local_ics"
+    synced_at = None
+
+    if event.sync_to_google:
+        try:
+            google_uid = agent.push_event_to_google(event.title, event.description, event.start_time, event.end_time)
+            if google_uid:
+                event_uid = google_uid
+                source = "google"
+                synced_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            print(f"Failed to push to Google Calendar, saving locally: {e}")
+
     try:
         cursor.execute(
             """INSERT INTO calendar_events 
-               (title, description, start_time, end_time, source, event_uid) 
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (event.title, event.description, event.start_time, event.end_time, "local_ics", event_uid)
+               (title, description, start_time, end_time, source, event_uid, tags, color, synced_at) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (event.title, event.description, event.start_time, event.end_time, source, event_uid, tags_json, color, synced_at)
         )
         conn.commit()
         event_id = cursor.lastrowid
@@ -1665,7 +1927,61 @@ def add_calendar_event(event: CalendarEventCreate):
     except Exception as e:
         print(f"Error serializing local events: {e}")
         
-    return {"status": "success", "id": event_id, "event_uid": event_uid}
+    return {"status": "success", "id": event_id, "event_uid": event_uid, "source": source}
+
+@app.put("/api/calendar/{event_id}")
+def update_calendar_event(event_id: int, event_data: CalendarEventUpdate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM calendar_events WHERE id = ?", (event_id,))
+        event = cursor.fetchone()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+
+        updates = []
+        params = []
+        if event_data.title is not None:
+            updates.append("title = ?")
+            params.append(event_data.title)
+        if event_data.description is not None:
+            updates.append("description = ?")
+            params.append(event_data.description)
+        if event_data.start_time is not None:
+            updates.append("start_time = ?")
+            params.append(event_data.start_time)
+        if event_data.end_time is not None:
+            updates.append("end_time = ?")
+            params.append(event_data.end_time)
+        if event_data.tags is not None:
+            updates.append("tags = ?")
+            params.append(json.dumps(event_data.tags))
+        if event_data.color is not None:
+            updates.append("color = ?")
+            params.append(event_data.color)
+
+        if updates:
+            params.append(event_id)
+            cursor.execute(f"UPDATE calendar_events SET {', '.join(updates)} WHERE id = ?", tuple(params))
+            conn.commit()
+
+        # Update in Google Calendar if synced
+        if event['source'] == 'google' and event['event_uid'] and '@local' not in event['event_uid']:
+            new_title = event_data.title or event['title']
+            new_desc = event_data.description if event_data.description is not None else event['description']
+            new_start = event_data.start_time or event['start_time']
+            new_end = event_data.end_time or event['end_time']
+            try:
+                agent.update_event_in_google(event['event_uid'], new_title, new_desc, new_start, new_end)
+            except Exception as e:
+                print(f"Error updating Google Calendar event: {e}")
+
+        return {"status": "success", "id": event_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 @app.delete("/api/calendar/{event_id}")
 def delete_calendar_event(event_id: int):
@@ -1677,9 +1993,13 @@ def delete_calendar_event(event_id: int):
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
             
-        if event['source'] != 'local_ics':
-            raise HTTPException(status_code=400, detail="Cannot delete Google Calendar events")
-            
+        # Delete from Google if source is google
+        if event['source'] == 'google' and event['event_uid'] and '@local' not in event['event_uid']:
+            try:
+                agent.delete_event_from_google(event['event_uid'])
+            except Exception as e:
+                print(f"Error deleting Google Calendar event: {e}")
+
         cursor.execute("DELETE FROM calendar_events WHERE id = ?", (event_id,))
         conn.commit()
     except Exception as e:
@@ -1695,6 +2015,123 @@ def delete_calendar_event(event_id: int):
         
     return {"status": "success"}
 
+@app.post("/api/calendar/sync-google")
+def trigger_google_calendar_sync():
+    """
+    Bidirectional trigger: pulls latest Google Calendar events into Athena and updates timestamp.
+    """
+    try:
+        agent.sync_google_calendar_to_db()
+        return {
+            "status": "success", 
+            "message": "Google Calendar sync completed", 
+            "synced_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google Calendar sync failed: {str(e)}")
+
+@app.get("/api/calendar/gaps")
+def get_calendar_gaps(date: str, day_start: str = "08:00", day_end: str = "22:00"):
+    """
+    Calculate free time gaps between events on a specific date (YYYY-MM-DD),
+    and suggest ready, unblocked tasks that fit each gap duration.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        # Fetch events for that day
+        start_bound = f"{date} 00:00:00"
+        end_bound = f"{date} 23:59:59"
+        cursor.execute(
+            """SELECT id, title, start_time, end_time 
+               FROM calendar_events 
+               WHERE (start_time >= ? AND start_time <= ?) 
+                  OR (end_time >= ? AND end_time <= ?)
+               ORDER BY start_time ASC""",
+            (start_bound, end_bound, start_bound, end_bound)
+        )
+        day_events = cursor.fetchall()
+
+        # Parse event intervals
+        busy_intervals = []
+        for ev in day_events:
+            try:
+                s_str = ev['start_time'].strip().replace("T", " ")
+                e_str = ev['end_time'].strip().replace("T", " ")
+                s_dt = datetime.strptime(s_str[:16], "%Y-%m-%d %H:%M")
+                e_dt = datetime.strptime(e_str[:16], "%Y-%m-%d %H:%M")
+                if e_dt > s_dt:
+                    busy_intervals.append((s_dt, e_dt))
+            except Exception:
+                continue
+
+        # Sort and merge overlapping busy intervals
+        busy_intervals.sort(key=lambda x: x[0])
+        merged_busy = []
+        for interval in busy_intervals:
+            if not merged_busy:
+                merged_busy.append(interval)
+            else:
+                last_s, last_e = merged_busy[-1]
+                if interval[0] <= last_e:
+                    merged_busy[-1] = (last_s, max(last_e, interval[1]))
+                else:
+                    merged_busy.append(interval)
+
+        # Day window
+        win_start = datetime.strptime(f"{date} {day_start}", "%Y-%m-%d %H:%M")
+        win_end = datetime.strptime(f"{date} {day_end}", "%Y-%m-%d %H:%M")
+
+        # Find gaps
+        gaps = []
+        curr_time = win_start
+        for b_start, b_end in merged_busy:
+            if b_start > curr_time:
+                gap_start = max(curr_time, win_start)
+                gap_end = min(b_start, win_end)
+                if gap_end > gap_start:
+                    dur_mins = int((gap_end - gap_start).total_seconds() / 60)
+                    if dur_mins >= 15:
+                        gaps.append({
+                            "start": gap_start.strftime("%H:%M"),
+                            "end": gap_end.strftime("%H:%M"),
+                            "duration_minutes": dur_mins
+                        })
+            curr_time = max(curr_time, b_end)
+
+        if curr_time < win_end:
+            dur_mins = int((win_end - curr_time).total_seconds() / 60)
+            if dur_mins >= 15:
+                gaps.append({
+                    "start": curr_time.strftime("%H:%M"),
+                    "end": win_end.strftime("%H:%M"),
+                    "duration_minutes": dur_mins
+                })
+
+        # Fetch ready/unblocked tasks
+        cursor.execute("SELECT * FROM tasks WHERE status = 'pending' ORDER BY due_date ASC, created_at DESC")
+        raw_tasks = cursor.fetchall()
+        full_tasks = [_get_full_task_data(cursor, r, now_str) for r in raw_tasks]
+        ready_tasks = [t for t in full_tasks if not t['is_blocked']]
+
+        priority_order = {'high': 3, 'medium': 2, 'low': 1}
+        ready_tasks.sort(key=lambda x: (
+            -priority_order.get(x.get('priority', 'medium'), 2),
+            x.get('due_date') or '9999-99-99'
+        ))
+
+        # Match tasks to each gap
+        for g in gaps:
+            matching = [t for t in ready_tasks if (t.get('estimated_minutes') or 30) <= g['duration_minutes']]
+            g['recommended_tasks'] = matching[:6]
+
+        return {"date": date, "gaps": gaps}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 # --- AGENT CONTROLLER ---
 def run_agent_in_background():
     global agent_running
@@ -1705,8 +2142,15 @@ def run_agent_in_background():
         
     try:
         print("Starting background Athena agent synchronization run...")
-        agent.run_agent_sync()
-        print("Background Athena agent synchronization completed successfully.")
+        bg_conn = create_new_connection()
+        bg_conn._is_request_scoped = False
+        token = _db_conn_var.set(bg_conn)
+        try:
+            agent.run_agent_sync()
+            print("Background Athena agent synchronization completed successfully.")
+        finally:
+            bg_conn.close()
+            _db_conn_var.reset(token)
     except Exception as e:
         print(f"Background agent execution error: {e}")
     finally:

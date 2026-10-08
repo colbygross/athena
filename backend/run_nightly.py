@@ -1,21 +1,33 @@
 #!/usr/bin/env python3
 """
-Nightly pipeline: daily brief (today) → daily summary (archive yesterday) → rolling summaries.
-Runs after inbox processing completes.
+Nightly pipeline:
+1. Daily Archive (today): Archives today's events, completed tasks, transactions, and vitals; deletes today's brief.
+2. Garbage Collection & Task Reset: Purges completed one-off tasks from DB and resets recurring tasks.
+3. Daily Brief (tomorrow): Generates tomorrow's brief with schedule, tasks, and workout routine.
 """
 import sys
 import os
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agent import generate_daily_brief, generate_daily_summary, generate_obsidian_summaries
+from agent import generate_daily_brief, generate_daily_summary, archive_and_reset_tasks_nightly
+
+def run_nightly_pipeline():
+    today = datetime.now().strftime("%Y-%m-%d")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    print("=== NIGHTLY PIPELINE ===")
+    print(f"1/3 Daily Archive (today: {today})...")
+    generate_daily_summary(target_date=today)
+
+    print("2/3 Garbage collect completed tasks & reset recurring tasks...")
+    archive_and_reset_tasks_nightly(target_date=today)
+
+    print(f"3/3 Daily Brief (tomorrow: {tomorrow})...")
+    generate_daily_brief(target_date=tomorrow)
+
+    print("=== PIPELINE COMPLETE ===")
 
 if __name__ == "__main__":
-    print("=== NIGHTLY SUMMARY PIPELINE ===")
-    print("1/3 Daily Brief (today)...")
-    generate_daily_brief()
-    print("2/3 Daily Summary (archive yesterday)...")
-    generate_daily_summary()
-    print("3/3 Rolling summaries...")
-    generate_obsidian_summaries()
-    print("=== PIPELINE COMPLETE ===")
+    run_nightly_pipeline()

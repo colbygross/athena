@@ -113,9 +113,9 @@ Reference: [[02_Areas/Fitness/Workout_Regimen|Workout Regimen]]
 
 ---
 
-## 4. Retrospective Retrospection Logs
-
-At `23:59`, the script `backend/run_nightly.py` runs the retrospective flow:
-1.  **Read Vitals & Logs**: Summarizes daily metrics recorded in database transaction lists, biometrics vitals, meals protein macros, and habit logs.
-2.  **Retrospective Note**: Writes a daily log summary note inside `04_Archives/Daily_Summary_YYYY-MM-DD.md` for permanent retention.
-3.  **Active Cleanup**: Deletes the morning brief from `Daily_Briefs/` to avoid cluttering active workspace directories.
+## 4. Retrospective & Nightly Pipeline
+ 
+At `23:59`, the script `backend/run_nightly.py` runs the 3-step pipeline:
+1.  **Daily Archive**: Queries SQLite for today's events, completed tasks, financial transactions, and the most recent vitals log, writes a daily log summary note inside `04_Archives/Daily_Summary_YYYY-MM-DD.md` for permanent retention, and deletes today's active brief from `Daily_Briefs/`.
+2.  **Garbage Collection & Task Reset**: Permanently purges completed one-off tasks from SQLite, resets recurring tasks (daily, weekly, monthly) to pending, and synchronizes `tasks.md`.
+3.  **Tomorrow's Daily Brief**: Prepares `Daily_Briefs/Daily_Brief_YYYY-MM-DD.md` for tomorrow with scheduled events, outstanding/overdue tasks, and the scheduled workout routine so it is ready upon waking.

@@ -700,7 +700,7 @@ function FitnessTab({
                 <button 
                   onClick={() => handleLogSession(selectedDayIdx, 'am')}
                   className="btn-primary" 
-                  style={{ background: 'var(--accent-cyan)', color: '#000', padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
                 >
                   LOG AM WORKOUT
                 </button>
@@ -749,7 +749,7 @@ function FitnessTab({
                   <button 
                     onClick={() => handleLogSession(selectedDayIdx, 'pm')}
                     className="btn-primary" 
-                    style={{ background: 'var(--accent-purple)', color: '#fff', padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
                   >
                     LOG PM WORKOUT
                   </button>
@@ -1014,19 +1014,19 @@ function FitnessTab({
               </button>
             </div>
             <div className="grid-4col" style={{ gap: '0.5rem', fontSize: '0.75rem' }}>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
                 <strong style={{ color: 'var(--accent-cyan)' }}>Phase 1 (10m): Spinal Decompression</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Child's pose lat reach (3m), Cat-Cow to thread needle (4m), Down Dog pedals (3m)</p>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
                 <strong style={{ color: 'var(--accent-green)' }}>Phase 2 (15m): Dynamic Hip/Ankle</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>World's Greatest Stretch, Low Lunge to Half Splits flow, Garland Pose squat hold (5m)</p>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
                 <strong style={{ color: 'var(--accent-yellow)' }}>Phase 3 (25m): Deep Yin Holds</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Pigeon Pose (3m/side), Frog Pose (4m), Lying Hero (4m), Puppy Pose (3m), Reclined Twist (4m)</p>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
                 <strong style={{ color: 'var(--accent-purple)' }}>Phase 4 (10m): Parasympathetic</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Legs-Up-The-Wall Savasana (10m) with 4s inhale / 6s exhale tempo</p>
               </div>

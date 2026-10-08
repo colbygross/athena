@@ -394,8 +394,8 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
                       onClick={() => handleIgnoreLead(selectedLead.id)} 
-                      className="btn-primary" 
-                      style={{ background: 'rgba(255,0,0,0.1)', color: 'red', border: '1px solid red', padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                      className="btn-danger" 
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
                     >
                       Ignore
                     </button>
@@ -403,7 +403,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       onClick={() => handleProcessLead(selectedLead.id)} 
                       disabled={processingLeadId !== null}
                       className="btn-primary" 
-                      style={{ background: 'var(--accent-cyan)', color: '#000', padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 'bold' }}
+                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 'bold' }}
                     >
                       {processingLeadId === selectedLead.id ? "TAILORING PACKET..." : "APPROVE & TAILOR (1-CLICK)"}
                     </button>
@@ -524,8 +524,8 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <button 
                       onClick={handleSaveAppEdits} 
                       disabled={isSavingAppEdits}
-                      className="btn-primary" 
-                      style={{ background: 'transparent', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                      className="btn-secondary" 
+                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
                     >
                       {isSavingAppEdits ? "Saving..." : "Save Edits"}
                     </button>
@@ -533,7 +533,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       onClick={() => handleSendEmail(selectedApp.id)} 
                       disabled={sendingEmailId === selectedApp.id || selectedApp.outreach_status === 'sent'}
                       className="btn-primary" 
-                      style={{ background: selectedApp.outreach_status === 'sent' ? '#333' : 'var(--accent-purple)', color: selectedApp.outreach_status === 'sent' ? '#aaa' : '#fff', fontSize: '0.75rem', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}
+                      style={{ background: selectedApp.outreach_status === 'sent' ? 'var(--bg-surface)' : 'var(--text-primary)', color: selectedApp.outreach_status === 'sent' ? 'var(--text-muted)' : 'var(--bg-primary, #ffffff) !important', border: selectedApp.outreach_status === 'sent' ? '1px solid var(--border-cyan)' : 'none', fontSize: '0.75rem', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}
                     >
                       {sendingEmailId === selectedApp.id ? "Sending..." : selectedApp.outreach_status === 'sent' ? "Outreach Logged" : "SEND RECRUITER OUTREACH"}
                     </button>

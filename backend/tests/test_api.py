@@ -139,27 +139,24 @@ def test_student_loans_endpoints():
     assert len(data["student_loans"]) == 0
 
 
-def test_budgets_endpoints():
-    # 1. Get budgets (initially empty)
+def test_budgets_endpoints(tmp_path, monkeypatch):
+    # Budgets are static, read from a JSON config file
+    cfg = tmp_path / "budget.json"
+    cfg.write_text('{"budgets": [{"category": "food", "limit_amount": 500}]}')
+    monkeypatch.setattr(main, "BUDGET_CONFIG_PATH", str(cfg))
+
     response = client.get("/api/budgets")
     assert response.status_code == 200
-    assert len(response.json()["budgets"]) == 0
-
-    # 2. Set/Add budget
-    budget_data = {
-        "category": "food",
-        "limit_amount": 500.0
-    }
-    response = client.post("/api/budgets", json=budget_data)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-
-    # 3. Get budgets again
-    response = client.get("/api/budgets")
     data = response.json()
-    assert len(data["budgets"]) == 1
-    assert data["budgets"][0]["category"] == "food"
-    assert data["budgets"][0]["limit_amount"] == 500.0
+    assert data["budgets"] == [{"category": "food", "limit_amount": 500.0}]
+
+    # The finances payload uses the same static budgets
+    response = client.get("/api/finances")
+    assert response.json()["budgets"] == data["budgets"]
+
+    # Budgets can no longer be set through the API
+    response = client.post("/api/budgets", json={"category": "food", "limit_amount": 1})
+    assert response.status_code == 405
 
 def test_recurring_endpoints():
     # Pre-req: Get account checking id

@@ -31,9 +31,15 @@ def create_new_connection():
 
 def get_db_connection():
     try:
-        return _db_conn_var.get()
+        conn = _db_conn_var.get()
+        try:
+            conn.execute("SELECT 1;")
+            return conn
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            pass
     except LookupError:
-        return create_new_connection()
+        pass
+    return create_new_connection()
 
 def init_db():
     conn = get_db_connection()
@@ -258,7 +264,37 @@ def init_db():
         completed_at DATETIME,
         source_file TEXT, -- e.g., "01_Projects/My Project.md"
         line_number INTEGER,
+        priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+        importance TEXT DEFAULT 'minor',
+        estimated_minutes INTEGER DEFAULT 30,
+        recurrence TEXT CHECK(recurrence IN ('none', 'daily', 'weekly', 'monthly')) DEFAULT 'none',
+        last_reset_date TEXT,
+        event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 8b. task_subtasks table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS task_subtasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        is_completed BOOLEAN DEFAULT 0,
+        position INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 8c. task_prerequisites table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS task_prerequisites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        prerequisite_type TEXT CHECK(prerequisite_type IN ('task', 'event')) NOT NULL,
+        prerequisite_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(task_id, prerequisite_type, prerequisite_id)
     );
     """)
 
@@ -272,6 +308,9 @@ def init_db():
         end_time DATETIME NOT NULL,
         source TEXT CHECK(source IN ('google', 'local_ics')) DEFAULT 'local_ics',
         event_uid TEXT UNIQUE, -- Google Event ID or ICS UID
+        tags TEXT DEFAULT '[]', -- JSON array of tag strings e.g. ["#Work", "#Meeting"]
+        color TEXT DEFAULT '#4facfe',
+        synced_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     """)
@@ -405,7 +444,7 @@ def init_db():
         except Exception as e:
             print(f"Error during weight_lbs migration: {e}")
     
-    # MIGRATION: Add priority and importance to tasks if they don't exist
+    # MIGRATION: Add priority, importance, estimated_minutes, recurrence, last_reset_date, event_id to tasks if they don't exist
     cursor.execute("PRAGMA table_info(tasks);")
     task_columns = [row['name'] for row in cursor.fetchall()]
     if 'priority' not in task_columns:
@@ -414,6 +453,31 @@ def init_db():
     if 'importance' not in task_columns:
         print("Migrating: Adding importance column to tasks table...")
         cursor.execute("ALTER TABLE tasks ADD COLUMN importance TEXT DEFAULT 'minor';")
+    if 'estimated_minutes' not in task_columns:
+        print("Migrating: Adding estimated_minutes column to tasks table...")
+        cursor.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER DEFAULT 30;")
+    if 'recurrence' not in task_columns:
+        print("Migrating: Adding recurrence column to tasks table...")
+        cursor.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none';")
+    if 'last_reset_date' not in task_columns:
+        print("Migrating: Adding last_reset_date column to tasks table...")
+        cursor.execute("ALTER TABLE tasks ADD COLUMN last_reset_date TEXT;")
+    if 'event_id' not in task_columns:
+        print("Migrating: Adding event_id column to tasks table...")
+        cursor.execute("ALTER TABLE tasks ADD COLUMN event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL;")
+
+    # MIGRATION: Add tags, color, synced_at to calendar_events if they don't exist
+    cursor.execute("PRAGMA table_info(calendar_events);")
+    cal_columns = [row['name'] for row in cursor.fetchall()]
+    if 'tags' not in cal_columns:
+        print("Migrating: Adding tags column to calendar_events table...")
+        cursor.execute("ALTER TABLE calendar_events ADD COLUMN tags TEXT DEFAULT '[]';")
+    if 'color' not in cal_columns:
+        print("Migrating: Adding color column to calendar_events table...")
+        cursor.execute("ALTER TABLE calendar_events ADD COLUMN color TEXT DEFAULT '#4facfe';")
+    if 'synced_at' not in cal_columns:
+        print("Migrating: Adding synced_at column to calendar_events table...")
+        cursor.execute("ALTER TABLE calendar_events ADD COLUMN synced_at DATETIME;")
     
     # MIGRATION: Add career columns to job_applications if they don't exist
     cursor.execute("PRAGMA table_info(job_applications);")
@@ -513,7 +577,13 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status_completed_at ON tasks(status, completed_at);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurring_transactions_account_id ON recurring_transactions(account_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_calendar_events_start_time ON calendar_events(start_time);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_calendar_events_end_time ON calendar_events(end_time);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_source_file ON tasks(source_file);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_recurrence ON tasks(recurrence);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_event_id ON tasks(event_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_subtasks_task_id ON task_subtasks(task_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_prerequisites_task_id ON task_prerequisites(task_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_prerequisites_prereq ON task_prerequisites(prerequisite_type, prerequisite_id);")
     
     conn.commit()
     conn.close()

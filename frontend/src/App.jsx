@@ -68,6 +68,29 @@ function App() {
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Mobile / Touchscreen device detection
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+  });
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 768px), (pointer: coarse)');
+    const onChange = (e) => {
+      setIsMobile(e.matches);
+    };
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      document.body.classList.add('is-mobile');
+    } else {
+      document.body.classList.remove('is-mobile');
+    }
+  }, [isMobile]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -494,9 +517,12 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove('stark-light', 'soft-dark', 'soft-light', 'stark-dark');
+    root.classList.remove('stark-light', 'soft-dark', 'soft-light', 'stark-dark', 'light-mode');
     if (theme !== 'stark-dark') {
       root.classList.add(theme);
+    }
+    if (theme === 'stark-light' || theme === 'soft-light') {
+      root.classList.add('light-mode');
     }
     localStorage.setItem('athena-theme', theme);
   }, [theme]);
@@ -673,6 +699,7 @@ function App() {
             showToast={showToast}
             fetchAllData={fetchAllData}
             API_BASE={API_BASE}
+            isMobile={isMobile}
           />
         )}
 
@@ -699,6 +726,7 @@ function App() {
             setFilterAccount={setFilterAccount}
             filterDateRange={filterDateRange}
             setFilterDateRange={setFilterDateRange}
+            setActiveTab={setActiveTab}
           />
         )}
 

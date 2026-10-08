@@ -108,16 +108,13 @@ The system is automated by four Python scripts executed periodically by system s
     *   Runs when files are placed in Vault's `Inbox/`.
     *   Uses OCR / text-extraction tools and prompts a local LLM (e.g. Qwen/Phi-4 via Ollama) to extract receipt amounts, merchants, medical diagnostics, or CS concepts.
     *   Renames files to `YYYY-MM-DD_name.ext`, saves them under `storage/`, inserts database logs, and writes companion vault notes.
-2.  **Daily Brief Generator ([backend/run_daily_brief.py](../backend/run_daily_brief.py))**:
-    *   Runs daily at 05:00.
-    *   Calculates the active workout regimen day index: `cycle_day = (today_dt - anchor_date).days % 4`.
-    *   Injects schedules, outstanding tasks, habits, and today's workout checkbox list into `obsidian_vault/Daily_Briefs/Daily_Brief_YYYY-MM-DD.md`.
-3.  **Nightly Retrospective ([backend/run_nightly.py](../backend/run_nightly.py))**:
-    *   Runs daily at 23:59.
-    *   Summarizes completed tasks, habits completed, nutrition macros, and biometrics.
-    *   Creates a retrospective file at `obsidian_vault/04_Archives/Daily_Summary_YYYY-MM-DD.md` and deletes the active morning brief.
-4.  **Rolling Summaries Builder ([backend/run_summaries.py](../backend/run_summaries.py))**:
-    *   Summarizes logs from the past month to regenerate the main vault indices under `obsidian_vault/Summaries/` (`Financial_Summary.md`, `Health_Fitness_Summary.md`, and `Learning_Career_Summary.md`).
+2.  **Nightly Pipeline ([backend/run_nightly.py](../backend/run_nightly.py))**:
+    *   Runs nightly at 23:59 as a unified 3-step pipeline:
+        1. **Daily Archive**: Archives today's events, completed tasks, financial transactions, and most recent vitals log to `obsidian_vault/04_Archives/Daily_Summary_YYYY-MM-DD.md`, and cleans up today's daily brief.
+        2. **Garbage Collection & Task Reset**: Permanently purges completed one-off tasks from SQLite, resets recurring tasks (daily, weekly, monthly) to pending, and synchronizes `obsidian_vault/tasks.md`.
+        3. **Tomorrow's Daily Brief**: Generates `obsidian_vault/Daily_Briefs/Daily_Brief_YYYY-MM-DD.md` for tomorrow with schedule, pending/overdue tasks, and the scheduled workout routine.
+3.  **Rolling Summaries Builder ([backend/run_summaries.py](../backend/run_summaries.py))**:
+    *   Standalone utility to regenerate vault index files under `obsidian_vault/Summaries/` (`Financial_Summary.md`, `Health_Fitness_Summary.md`, and `Learning_Career_Summary.md`) on demand or via specialized local LLM runs.
 
 ---
 
