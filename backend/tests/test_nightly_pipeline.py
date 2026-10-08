@@ -41,6 +41,10 @@ def setup_isolation(monkeypatch, tmp_path):
 """, encoding="utf-8")
 
     monkeypatch.setattr(agent, "VAULT_DIR", str(temp_vault))
+    import run_nightly
+    monkeypatch.setattr(run_nightly, "generate_daily_brief", agent.generate_daily_brief)
+    monkeypatch.setattr(run_nightly, "generate_daily_summary", agent.generate_daily_summary)
+    monkeypatch.setattr(run_nightly, "archive_and_reset_tasks_nightly", agent.archive_and_reset_tasks_nightly)
 
     yield temp_vault
 
