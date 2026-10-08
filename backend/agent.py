@@ -1585,7 +1585,7 @@ def scan_vault_for_tasks():
         for file in files:
             if not file.endswith('.md'):
                 continue
-            if file == "tasks.md":
+            if file == "tasks.md" or file.endswith(".sample.md"):
                 continue
                 
             file_path = os.path.join(root, file)
