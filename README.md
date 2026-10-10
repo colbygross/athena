@@ -11,13 +11,17 @@
 ![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-white?style=for-the-badge&logo=ollama&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-[![CI](https://img.shields.io/badge/CI-Passing-success?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/colbygross/athena/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/colbygross/athena/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/colbygross/athena/actions/workflows/ci.yml)
 
 <p align="center">
   <strong>An autonomous full-stack personal telemetry and knowledge operating system bridging local multi-modal LLMs, double-entry financial ledgering, biometric tracking, and bidirectional Obsidian knowledge base synchronization.</strong>
 </p>
 
 </div>
+
+---
+
+**In plain terms:** Athena is a self-hosted dashboard for running my day. Drop a receipt, lab result or PDF into an inbox folder and a local LLM reads it, files it, and updates the database and my Obsidian notes. A React dashboard shows finances, health, tasks, habits and job applications, and nightly agents write a daily brief. Everything runs on my own machine; no data goes to a cloud AI service.
 
 ---
 
@@ -224,6 +228,17 @@ Comprehensive automated test suites cover database integrity, REST API endpoints
 # Run backend test suite
 pytest backend/tests -v
 ```
+
+---
+
+## 🛠️ How I Built This
+
+Athena was built with AI coding agents, with me acting as the lead engineer:
+
+- **Spec first.** The visual design system lives in [`DESIGN.md`](DESIGN.md) and the architecture in [`docs/`](docs/), so each agent task starts from a written description of what to build instead of a vague prompt.
+- **Small, reviewable changes.** Work lands as focused conventional commits (`feat:`, `fix:`, `test:`) that I review before merging.
+- **Tests as the guardrail.** A pytest suite of 60+ tests covers the database, REST API, SQL sanitization, a security audit, and full end-to-end lifecycle runs with the LLM mocked out. GitHub Actions runs it, plus a frontend build, on every push.
+- **Agent skills.** The [`skills/`](skills/) folder holds skill files that let an AI agent query, edit and search Athena's database and vault safely, so the project can be operated by an agent as well as built by one.
 
 ---
 
