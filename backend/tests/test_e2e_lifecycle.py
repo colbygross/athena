@@ -36,6 +36,10 @@ def setup_environment(monkeypatch, tmp_path):
     (temp_vault / "Daily_Briefs").mkdir(parents=True, exist_ok=True)
     (temp_vault / "Summaries").mkdir(parents=True, exist_ok=True)
     
+    cfg = tmp_path / "budget.json"
+    cfg.write_text(json.dumps({"budgets": [{"category": "groceries", "limit_amount": 600.0}]}))
+    monkeypatch.setattr(main, "BUDGET_CONFIG_PATH", str(cfg))
+    
     if os.path.exists(TEST_DB_PATH):
         try:
             os.remove(TEST_DB_PATH)
@@ -103,11 +107,9 @@ def test_financial_ledger_lifecycle():
     # Expected net wealth: 2750 + 5000 = 7750
     assert fin_data["net_wealth"] == 7750.0
 
-    # 4. Set budget for groceries
-    res_bgt = client.post("/api/budgets", json={"category": "groceries", "limit_amount": 600.0})
-    assert res_bgt.status_code == 200
-
+    # 4. Verify budget configuration in /api/finances
     res_fin_bgt = client.get("/api/finances")
+    assert res_fin_bgt.status_code == 200
     bgt_list = res_fin_bgt.json()["budgets"]
     groceries_bgt = next(b for b in bgt_list if b["category"] == "groceries")
     assert groceries_bgt["limit_amount"] == 600.0

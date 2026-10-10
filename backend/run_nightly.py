@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agent import generate_daily_brief, generate_daily_summary, archive_and_reset_tasks_nightly
+import agent
 
 def run_nightly_pipeline():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -19,13 +19,13 @@ def run_nightly_pipeline():
 
     print("=== NIGHTLY PIPELINE ===")
     print(f"1/3 Daily Archive (today: {today})...")
-    generate_daily_summary(target_date=today)
+    agent.generate_daily_summary(target_date=today)
 
     print("2/3 Garbage collect completed tasks & reset recurring tasks...")
-    archive_and_reset_tasks_nightly(target_date=today)
+    agent.archive_and_reset_tasks_nightly(target_date=today)
 
     print(f"3/3 Daily Brief (tomorrow: {tomorrow})...")
-    generate_daily_brief(target_date=tomorrow)
+    agent.generate_daily_brief(target_date=tomorrow)
 
     print("=== PIPELINE COMPLETE ===")
 
