@@ -66,6 +66,7 @@ obsidian_vault/calendar.ics
 # Scratch, Local Notes & Temporary Scripts
 *.local
 *.local.*
+ATHENA_MAC_ACCESS.md
 read_pdf.py
 design_base64.txt
 
