@@ -2213,7 +2213,8 @@ def run_agent_sync():
 
     # 7. Generate Daily Summary (archive yesterday, delete old brief)
     print("\nGenerating Daily Summary for yesterday...")
-    generate_daily_summary()
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    generate_daily_summary(target_date=yesterday)
 
     # 8. Generate Summaries
     print("\nRegenerating summaries...")
