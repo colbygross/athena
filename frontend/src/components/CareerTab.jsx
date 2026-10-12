@@ -252,7 +252,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
   return (
     <div>
       <header className="page-header" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <h1 className="page-title text-gradient-yellow glitch-text">Career Tracker</h1>
             <p className="page-subtitle font-mono">Priority 1: Automated Income Acquisition</p>

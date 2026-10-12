@@ -2956,7 +2956,9 @@ h1, h2, h3, h4, h5, h6 {
 .is-mobile .main-content {
   margin-left: 0 !important;
   margin-bottom: calc(65px + env(safe-area-inset-bottom, 15px)) !important;
-  padding: 0.75rem 0.65rem !important;
+  min-width: 0; /* Let wide children scroll inside instead of widening the page */
+  /* Clear the notch/status bar when launched from the iOS home screen */
+  padding: calc(0.75rem + env(safe-area-inset-top, 0px)) calc(0.65rem + env(safe-area-inset-right, 0px)) 0.75rem calc(0.65rem + env(safe-area-inset-left, 0px)) !important;
   padding-bottom: calc(75px + env(safe-area-inset-bottom, 20px)) !important;
 }
 
@@ -3057,6 +3059,23 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 100% !important;
   animation: slideUpBottom 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   padding-bottom: calc(1rem + env(safe-area-inset-bottom, 15px)) !important;
+}
+
+/* Sub-tab rows scroll sideways on phones instead of stretching the page */
+.is-mobile .tab-navigation {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.is-mobile .tab-navigation .tab-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.is-mobile .toast-container {
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  right: 0.75rem;
+  left: 0.75rem;
 }
 
 @keyframes slideUpBottom {
