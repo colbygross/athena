@@ -58,3 +58,14 @@ jobs:
       - name: Build Production Bundle
         working-directory: frontend
         run: npm run build
+
+  deploy:
+    name: Deploy to Production
+    needs: [backend-tests, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: self-hosted
+
+    steps:
+      - name: Run Production Deployment Script
+        run: /home/archer/ATHENA/scripts/deploy.sh
+
