@@ -55,6 +55,24 @@ function FinancesTab({
   const [editingLoanId, setEditingLoanId] = useState(null);
 
   // Financial Operation Helpers
+  const deleteTransaction = async (txId, merchant, amount) => {
+    const label = merchant ? `"${merchant}" ($${Number(amount).toFixed(2)})` : `$${Number(amount).toFixed(2)}`;
+    if (!confirm(`Are you sure you want to delete the transaction for ${label}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/finances/${txId}`, {
+        method: 'DELETE'
+      }).then(r => r.json());
+      if (res.status === 'success') {
+        showToast("Transaction deleted successfully!", "success");
+        fetchAllData();
+      } else {
+        showToast("Error deleting transaction: " + (res.detail || "Unknown error"), "error");
+      }
+    } catch (err) {
+      showToast("Error deleting transaction: " + err, "error");
+    }
+  };
+
   const deleteAccount = async (accountId, accountName) => {
     if (!confirm(`Are you sure you want to delete "${accountName}"? All linked transactions will have their account unlinked, and linked recurring transactions will be deleted.`)) return;
     try {
@@ -567,6 +585,14 @@ function FinancesTab({
                         <span className="item-value" style={{ fontSize: '0.9rem', color: tx.type === 'expense' ? 'var(--color-danger)' : tx.type === 'transfer' ? 'var(--accent-yellow)' : 'var(--color-success)' }}>
                           ${tx.amount.toFixed(2)}
                         </span>
+                        <button
+                          className="btn-danger-icon"
+                          onClick={() => deleteTransaction(tx.id, tx.merchant, tx.amount)}
+                          style={{ padding: '0.15rem 0.35rem', fontSize: '0.8rem', borderRadius: '4px', marginLeft: '0.2rem' }}
+                          title="Delete transaction"
+                        >
+                          ×
+                        </button>
                       </div>
                     </div>
                   ))}

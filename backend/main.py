@@ -456,6 +456,27 @@ def add_transaction(tx: TransactionCreate):
     finally:
         conn.close()
 
+@app.delete("/api/finances/{transaction_id}")
+@app.delete("/api/transactions/{transaction_id}")
+def delete_transaction(transaction_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM transactions WHERE id = ?", (transaction_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+        conn.commit()
+        return {"status": "success", "message": "Transaction deleted successfully", "id": transaction_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 @app.post("/api/finances/log-nlp")
 def log_transaction_nlp(req: NLPTransactionRequest):
     if not req.text or not req.text.strip():

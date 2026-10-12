@@ -274,6 +274,43 @@ def test_finances_dashboard_and_transactions():
     response_month = client.get("/api/finances?date_range=this_month")
     assert response_month.status_code == 200
 
+def test_delete_transaction_endpoint():
+    acc_res = client.get("/api/accounts")
+    checking_id = [a for a in acc_res.json()["accounts"] if a["name"] == "Capital One Checking"][0]["id"]
+
+    # 1. Add transaction
+    tx_payload = {
+        "date": "2026-05-20",
+        "amount": 75.50,
+        "type": "expense",
+        "category": "food",
+        "merchant": "Trader Joe's",
+        "description": "Weekly snacks",
+        "account_id": checking_id
+    }
+    create_res = client.post("/api/finances", json=tx_payload)
+    assert create_res.status_code == 200
+    tx_id = create_res.json()["id"]
+
+    # Verify transaction appears in finances
+    fin_res = client.get("/api/finances")
+    tx_list = [t for t in fin_res.json()["transactions"] if t["id"] == tx_id]
+    assert len(tx_list) == 1
+
+    # 2. Delete transaction via DELETE /api/finances/{id}
+    del_res = client.delete(f"/api/finances/{tx_id}")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "success"
+
+    # Verify transaction is gone
+    fin_res_after = client.get("/api/finances")
+    tx_list_after = [t for t in fin_res_after.json()["transactions"] if t["id"] == tx_id]
+    assert len(tx_list_after) == 0
+
+    # 3. Deleting non-existent transaction returns 404
+    del_404 = client.delete(f"/api/finances/{tx_id}")
+    assert del_404.status_code == 404
+
 def test_meals_endpoints():
     # 1. Get meals (empty)
     res = client.get("/api/meals")
