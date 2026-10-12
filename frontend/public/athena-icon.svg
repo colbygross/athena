@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#00f2fe" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Outer Hexagonal Frame -->
+  <path d="M50 5 L89 27.5 L89 72.5 L50 95 L11 72.5 L11 27.5 Z" stroke-opacity="0.3" stroke-dasharray="4 2" />
+  
+  <!-- Stylized 'A' - Sharp, Cybernetic, Symmetric -->
+  <path d="M50 15 L80 85 M50 15 L20 85" stroke-width="4" />
+  <path d="M30 65 L70 65" stroke-width="4" />
+  
+  <!-- Inner Detail / Anarchy Symbolism Subtle Infusion -->
+  <circle cx="50" cy="55" r="30" stroke="#39ff14" stroke-opacity="0.6" stroke-dasharray="2 4" />
+  
+  <!-- Tech Accents -->
+  <path d="M15 30 L25 30 M75 30 L85 30" stroke-width="1" />
+  <path d="M50 5 V15" stroke="#39ff14" />
+</svg>
