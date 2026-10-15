@@ -36,8 +36,8 @@ Calendar event colors come from `EVENT_COLORS` in `src/constants.js`: six muted 
 Three roles, defined as tokens:
 
 - `--font-display` (KH Interference): page titles (`h1`, `.page-title`), the wordmark and large stat numbers. Nothing else.
-- `--font-text` (system sans): all other text. Body, navigation, panel titles, buttons, labels, list items.
-- `--font-mono` (PP Fraktion Mono): figures that must line up: amounts, times and durations, with `tabular-nums`.
+- `--font-text` (PP Fraktion Mono): all other text. Body, navigation, panel titles, buttons, labels, list items.
+- `--font-mono` (PP Fraktion Mono): figures that must line up: amounts, times and durations, with `tabular-nums`. Same face as `--font-text`, kept as its own token for figures.
 
 Five sizes, and no others:
 
