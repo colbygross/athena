@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 function ApiKeyModal({ show, onClose, apiKeyInput, setApiKeyInput, showToast }) {
+  useEffect(() => {
+    if (!show) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [show, onClose]);
+
   if (!show) return null;
 
   return (
@@ -17,7 +24,7 @@ function ApiKeyModal({ show, onClose, apiKeyInput, setApiKeyInput, showToast }) 
       zIndex: 9999,
       fontFamily: 'var(--font-mono)'
     }}>
-      <div className="glass-panel" style={{
+      <div className="glass-panel" role="dialog" aria-modal="true" aria-label="API connection" style={{
         width: '95%',
         maxWidth: '450px',
         background: 'var(--bg-card)',
@@ -30,10 +37,10 @@ function ApiKeyModal({ show, onClose, apiKeyInput, setApiKeyInput, showToast }) 
       }}>
         <div className="panel-header" style={{ borderBottom: '1px solid var(--border-cyan)' }}>
           <div className="panel-title" style={{ color: 'var(--accent-pink)' }}>
-            <span className="material-symbols-outlined">vpn_key</span>
+            <span className="material-symbols-outlined" aria-hidden="true">vpn_key</span>
             [ NEURAL_LINK_API_CONFIG ]
           </div>
-          <button 
+          <button aria-label="Close" 
             onClick={onClose}
             style={{
               background: 'transparent',
@@ -54,7 +61,7 @@ function ApiKeyModal({ show, onClose, apiKeyInput, setApiKeyInput, showToast }) 
           
           <div className="form-group">
             <label className="form-label" style={{ color: 'var(--accent-pink)' }}>API Key (X-API-Key)</label>
-            <input 
+            <input autoFocus 
               type="password"
               className="form-input"
               placeholder="Enter secure API key"

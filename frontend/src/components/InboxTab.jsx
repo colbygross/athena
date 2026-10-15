@@ -40,7 +40,7 @@ function InboxTab({
             
             {agentStatus.inbox_files.length === 0 && agentStatus.status !== 'running' ? (
               <div className="inbox-empty-state">
-                <span className="material-symbols-outlined inbox-empty-icon" style={{ fontSize: '48px' }}>inbox</span>
+                <span className="material-symbols-outlined inbox-empty-icon" style={{ fontSize: '48px' }} aria-hidden="true">inbox</span>
                 <p style={{ fontWeight: 600 }}>Secure Uplink Clean!</p>
                 <p style={{ fontSize: '0.85rem' }}>Add receipts, PDFs, or notes to your Vault's `Inbox/` directory to have Athena integrate them.</p>
               </div>
@@ -52,7 +52,7 @@ function InboxTab({
                       <span className="item-title">{file}</span>
                       <span className="item-subtitle">Staged for Athena</span>
                     </div>
-                    <span className="material-symbols-outlined file-icon">hourglass_empty</span>
+                    <span className="material-symbols-outlined file-icon" aria-hidden="true">hourglass_empty</span>
                   </div>
                 ))}
               </div>
@@ -84,7 +84,7 @@ function InboxTab({
                       <span className="item-subtitle">Moved to: {file.new_path}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Processed at: {file.processed_at}</span>
                     </div>
-                    <span className="material-symbols-outlined" style={{ color: 'var(--color-success)' }}>check_circle</span>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--color-success)' }} aria-hidden="true">check_circle</span>
                   </a>
                 ))}
               </div>

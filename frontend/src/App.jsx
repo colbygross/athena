@@ -314,12 +314,13 @@ function App() {
     return (
       <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', border: '1px solid rgba(188, 19, 254, 0.15)' }}>
         <div className="panel-header" style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="material-symbols-outlined" style={{ color: 'var(--accent-purple)', fontSize: '1.2rem' }}>folder_shared</span>
+          <span className="material-symbols-outlined" style={{ color: 'var(--accent-purple)', fontSize: '1.2rem' }} aria-hidden="true">folder_shared</span>
           <h4 className="panel-title" style={{ fontSize: '0.9rem', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>Related Documents</h4>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {related.map(item => (
-            <a
+            <button
+              type="button"
               key={`${item.category}-${item.filename}`}
               onClick={() => {
                 setActiveTab('areas');
@@ -332,6 +333,9 @@ function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
+                width: '100%',
+                textAlign: 'left',
+                font: 'inherit',
                 color: 'var(--text-primary)',
                 fontSize: '0.85rem',
                 textDecoration: 'none',
@@ -341,10 +345,10 @@ function App() {
               }}
               className="list-item"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>description</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }} aria-hidden="true">description</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({item.category})</span>
-            </a>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({item.category})</span>
+            </button>
           ))}
         </div>
       </div>
@@ -858,11 +862,11 @@ function App() {
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast-card ${t.type}`}>
-            <span className="material-symbols-outlined toast-icon">
+            <span className="material-symbols-outlined toast-icon" aria-hidden="true">
               {t.type === 'success' ? 'check_circle' : t.type === 'error' ? 'error' : 'info'}
             </span>
             <span className="toast-message">{t.message}</span>
-            <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} className="toast-close-btn">&times;</button>
+            <button aria-label="Dismiss notification" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} className="toast-close-btn">&times;</button>
           </div>
         ))}
       </div>
