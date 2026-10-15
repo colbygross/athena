@@ -1,5 +1,6 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
+import { activateOnKey } from '../a11y';
 
 function AreasTab({
   areasList,
@@ -73,7 +74,7 @@ function AreasTab({
                         {catAreas.map((area) => {
                           const isSel = selectedArea && selectedArea.category === area.category && selectedArea.filename === area.filename;
                           return (
-                            <div 
+                            <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                               key={`${area.category}-${area.filename}`}
                               className="list-item area-list-item"
                               data-title={area.title}
@@ -94,7 +95,7 @@ function AreasTab({
                                 <span className="item-title" style={{ fontSize: '0.8rem', color: isSel ? 'var(--accent-purple)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                                   📄 {area.title}
                                 </span>
-                                <span className="item-subtitle" style={{ fontSize: '0.65rem' }}>{area.filename}</span>
+                                <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>{area.filename}</span>
                               </div>
                             </div>
                           );
@@ -183,7 +184,7 @@ function AreasTab({
             </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '300px', color: 'var(--text-muted)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }}>folder_open</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }} aria-hidden="true">folder_open</span>
               <p style={{ fontWeight: 600 }}>No Area Selected</p>
               <p style={{ fontSize: '0.85rem' }}>Select an area from the left index panel to view or edit its records.</p>
             </div>

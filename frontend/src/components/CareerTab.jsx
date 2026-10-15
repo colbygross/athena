@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { activateOnKey } from '../a11y';
 
 const API_BASE = import.meta.env.VITE_API_URL || (
   window.location.port === '5174'
@@ -271,19 +272,19 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
       {/* Metrics Banner */}
       <div className="grid-4col" style={{ marginBottom: '1.25rem', gap: '0.75rem' }}>
         <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-cyan)' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DISCOVERED LEADS</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DISCOVERED LEADS</span>
           <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: '1.4rem' }}>{localData.leads?.length || 0}</h3>
         </div>
         <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-green)' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 1: US REMOTE</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 1: US REMOTE</span>
           <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: '1.4rem' }}>{stats.tier1_count || 0}</h3>
         </div>
         <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 2: NEW ENGLAND</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 2: NEW ENGLAND</span>
           <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: '1.4rem' }}>{stats.tier2_count || 0}</h3>
         </div>
         <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-purple)' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TAILORED PACKETS</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TAILORED PACKETS</span>
           <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-purple)', fontSize: '1.4rem' }}>{localData.applications?.length || 0}</h3>
         </div>
       </div>
@@ -336,7 +337,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
               ) : (
                 <div className="item-list" style={{ maxHeight: '550px', overflowY: 'auto' }}>
                   {localData.leads.map((lead) => (
-                    <div 
+                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                       key={lead.id} 
                       className={`list-item ${selectedLead?.id === lead.id ? 'active' : ''}`}
                       onClick={() => setSelectedLead(lead)}
@@ -361,15 +362,15 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                         
                         <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                           {lead.is_remote ? (
-                            <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', background: 'rgba(0,240,255,0.15)', color: 'var(--accent-cyan)', borderRadius: '3px', border: '1px solid var(--accent-cyan)' }}>
+                            <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.3rem', background: 'rgba(0,240,255,0.15)', color: 'var(--accent-cyan)', borderRadius: '3px', border: '1px solid var(--accent-cyan)' }}>
                               TIER 1: US REMOTE
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', background: 'rgba(188,19,254,0.15)', color: 'var(--accent-purple)', borderRadius: '3px', border: '1px solid var(--accent-purple)' }}>
+                            <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.3rem', background: 'rgba(188,19,254,0.15)', color: 'var(--accent-purple)', borderRadius: '3px', border: '1px solid var(--accent-purple)' }}>
                               TIER 2: NEW ENGLAND REGIONAL
                             </span>
                           )}
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             Source: {lead.source.toUpperCase()}
                           </span>
                         </div>
@@ -486,7 +487,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
               ) : (
                 <div className="item-list">
                   {localData.applications.map((app) => (
-                    <div 
+                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                       key={app.id} 
                       className={`list-item ${selectedApp?.id === app.id ? 'active' : ''}`}
                       onClick={() => handleSelectApp(app)}

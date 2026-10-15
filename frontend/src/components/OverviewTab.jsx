@@ -1,4 +1,5 @@
 import React from 'react';
+import { activateOnKey } from '../a11y';
 
 function OverviewTab({ overviewData, setActiveTab, fileUrl, handleFormSubmit }) {
   if (!overviewData) return null;
@@ -108,7 +109,7 @@ function OverviewTab({ overviewData, setActiveTab, fileUrl, handleFormSubmit }) 
               const logged = overviewData.todays_habits.find(h => h.habit_name === habitName);
               const isCompleted = logged ? logged.completed === 1 : false;
               return (
-                <div 
+                <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                   key={habitName} 
                   className={`glass-panel habit-card ${isCompleted ? 'completed' : ''}`}
                   onClick={() => handleFormSubmit(

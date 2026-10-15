@@ -1,5 +1,6 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
+import { activateOnKey } from '../a11y';
 
 function ProjectsTab({
   projectsList,
@@ -55,7 +56,7 @@ function ProjectsTab({
                 {projectsList.map((proj) => {
                   const isSel = selectedProject === proj.filename;
                   return (
-                    <div 
+                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                       key={proj.filename}
                       className="list-item project-list-item"
                       data-title={proj.title}
@@ -76,7 +77,7 @@ function ProjectsTab({
                         <span className="item-title" style={{ color: isSel ? 'var(--accent-purple)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                           📁 {proj.title}
                         </span>
-                        <span className="item-subtitle" style={{ fontSize: '0.7rem' }}>{proj.filename}</span>
+                        <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>{proj.filename}</span>
                       </div>
                     </div>
                   );
@@ -161,7 +162,7 @@ function ProjectsTab({
             </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '300px', color: 'var(--text-muted)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }}>folder_open</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }} aria-hidden="true">folder_open</span>
               <p style={{ fontWeight: 600 }}>No Project Selected</p>
               <p style={{ fontSize: '0.85rem' }}>Select a project from the left index panel to view or edit its records.</p>
             </div>

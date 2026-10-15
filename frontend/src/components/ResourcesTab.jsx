@@ -1,5 +1,6 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
+import { activateOnKey } from '../a11y';
 
 function ResourcesTab({
   resourcesList,
@@ -55,7 +56,7 @@ function ResourcesTab({
                 {resourcesList.map((resItem) => {
                   const isSel = selectedResource === resItem.filename;
                   return (
-                    <div 
+                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                       key={resItem.filename}
                       className="list-item resource-list-item"
                       data-title={resItem.title}
@@ -76,7 +77,7 @@ function ResourcesTab({
                         <span className="item-title" style={{ color: isSel ? 'var(--accent-purple)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                           📁 {resItem.title}
                         </span>
-                        <span className="item-subtitle" style={{ fontSize: '0.7rem' }}>{resItem.filename}</span>
+                        <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>{resItem.filename}</span>
                       </div>
                     </div>
                   );
@@ -161,7 +162,7 @@ function ResourcesTab({
             </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '300px', color: 'var(--text-muted)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }}>folder_open</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }} aria-hidden="true">folder_open</span>
               <p style={{ fontWeight: 600 }}>No Resource Selected</p>
               <p style={{ fontSize: '0.85rem' }}>Select a resource from the left index panel to view or edit its records.</p>
             </div>

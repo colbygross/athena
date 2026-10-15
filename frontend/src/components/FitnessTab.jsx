@@ -663,7 +663,7 @@ function FitnessTab({
                   }}
                 >
                   <div style={{ fontWeight: 'bold' }}>{day.dayName.substring(0, 3).toUpperCase()}</div>
-                  <div style={{ fontSize: '0.6rem', opacity: 0.8, marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.2rem' }}>
                     {idx === 0 ? "Upper A" : idx === 1 ? "Kickbox" : idx === 2 ? "Lower A" : idx === 3 ? "Rest" : idx === 4 ? "Upper B" : idx === 5 ? "Lower B" : "Yoga"}
                   </div>
                   {isToday && (
@@ -821,17 +821,17 @@ function FitnessTab({
                   </thead>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Heavy Barbell Compounds<br/><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Squats, Bench, OHP, RDLs</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Heavy Barbell Compounds<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Squats, Bench, OHP, RDLs</span></td>
                       <td style={{ padding: '0.5rem' }}>Weight First (Double Progression)</td>
                       <td style={{ padding: '0.5rem', color: 'var(--accent-green)' }}>+5–10 lbs once top reps are hit</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Dumbbell & Cable Accessories<br/><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Incline DB, Rows, Pulldowns</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Dumbbell & Cable Accessories<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incline DB, Rows, Pulldowns</span></td>
                       <td style={{ padding: '0.5rem' }}>Reps & Form First</td>
                       <td style={{ padding: '0.5rem', color: 'var(--accent-yellow)' }}>+2.5–5 lbs per side / plate notch</td>
                     </tr>
                     <tr>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Isolation & Machines<br/><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Lateral Raises, Leg Curls, Arms</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Isolation & Machines<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Lateral Raises, Leg Curls, Arms</span></td>
                       <td style={{ padding: '0.5rem' }}>Time Under Tension & Volume</td>
                       <td style={{ padding: '0.5rem', color: 'var(--accent-purple)' }}>+1–2 reps or 2s slow eccentric</td>
                     </tr>
@@ -876,24 +876,24 @@ function FitnessTab({
           {/* Daily Macronutrient & Hydration Targets Banner */}
           <div className="grid-4col">
             <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-green)' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY PROTEIN</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY PROTEIN</span>
               <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: '1.3rem' }}>180–200g</h3>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>1.0g per lb (Muscle repair & striking)</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1.0g per lb (Muscle repair & striking)</span>
             </div>
             <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY CARBS</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY CARBS</span>
               <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: '1.3rem' }}>270–360g</h3>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>1.5-2.0g per lb (Heavy glycogen fuel)</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1.5-2.0g per lb (Heavy glycogen fuel)</span>
             </div>
             <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-pink)' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEALTHY FATS</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEALTHY FATS</span>
               <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-pink)', fontSize: '1.3rem' }}>60–80g</h3>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>0.35-0.4g per lb (Joints & hormones)</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>0.35-0.4g per lb (Joints & hormones)</span>
             </div>
             <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-cyan)' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HYDRATION RULE</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HYDRATION RULE</span>
               <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: '1.3rem' }}>128 oz (1 Gal)</h3>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>+1-2 Electrolyte packets Tue/Sat</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+1-2 Electrolyte packets Tue/Sat</span>
             </div>
           </div>
 
@@ -1112,10 +1112,10 @@ function FitnessTab({
                       <div key={wk.id} className="list-item" style={{ padding: '0.5rem', marginBottom: '0.35rem' }}>
                         <div className="item-meta">
                           <span className="item-title" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{wk.activity_type.toUpperCase()}</span>
-                          <span className="item-subtitle" style={{ fontSize: '0.7rem' }}>
+                          <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>
                             {wk.date} • {wk.duration_minutes} mins • {wk.calories_burned} kcal
                           </span>
-                          {wk.notes && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>{wk.notes}</span>}
+                          {wk.notes && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>{wk.notes}</span>}
                         </div>
                       </div>
                     ))}
