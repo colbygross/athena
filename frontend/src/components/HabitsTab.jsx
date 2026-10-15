@@ -15,9 +15,11 @@ function HabitsTab({ habitsData, handleFormSubmit, renderRelatedAreas }) {
 
   return (
     <div>
-      <header className="page-header">
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Habits</h1>
-        <p className="page-subtitle">Daily Routines: Repetition Sequence</p>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Daily Routines: Repetition Sequence</p>
+        </div>
       </header>
 
       <div className="grid-2col">

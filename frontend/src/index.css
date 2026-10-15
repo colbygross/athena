@@ -284,9 +284,12 @@ h2, h3, h4, h5, h6 {
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background-color: var(--text-primary);
+  -webkit-mask: var(--logo-url) center / contain no-repeat;
+  mask: var(--logo-url) center / contain no-repeat;
 }
 
 .logo-text {
@@ -460,6 +463,49 @@ h2, h3, h4, h5, h6 {
 .page-header {
   margin-bottom: 2.5rem;
   padding-bottom: 1.5rem;
+}
+
+.page-header--compact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0;
+}
+
+.page-header--compact .page-title {
+  margin-bottom: 0;
+}
+
+.page-header--brief {
+  margin-bottom: 1.25rem;
+  padding-bottom: 0;
+}
+
+.page-header-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.page-header-meta > *,
+.page-header-meta .page-date {
+  margin: 0;
+}
+
+.page-header-meta .page-date + .page-subtitle::before {
+  content: "|";
+  margin-right: 0.75rem;
+  color: var(--text-muted);
+}
+
+.page-header-meta .btn-primary {
+  padding: 0.35rem 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .page-title {
@@ -730,6 +776,16 @@ h2, h3, h4, h5, h6 {
   background: var(--text-primary);
   border-color: var(--text-primary);
   color: var(--bg-primary, var(--bg-space, #000000)) !important;
+}
+
+/* Inline styles set these buttons' background; keep hover readable on dark */
+.day-select-btn:hover {
+  color: var(--day-btn-color) !important;
+}
+
+.day-select-btn:hover:not(.active) {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent) !important;
+  border-color: var(--text-primary) !important;
 }
 
 .btn-danger {

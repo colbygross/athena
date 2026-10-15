@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import archerAnarchyLogo from './assets/archer_anarchy.svg';
+import athenaLogo from './assets/athena_logo.svg';
 
 import SettingsDialog from './components/SettingsDialog';
 import MobileTabBar from './components/MobileTabBar';
@@ -684,7 +684,7 @@ function App() {
           setActiveTab={navigateToTab}
           openSettings={() => setShowSettings(true)}
           inboxCount={agentStatus?.inbox_count || 0}
-          logoSrc={archerAnarchyLogo}
+          logoSrc={athenaLogo}
         />
       )}
 

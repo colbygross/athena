@@ -174,18 +174,18 @@ function FinancesTab({
 
   return (
     <div>
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 className="page-title">Finances</h1>
+      <header className="page-header page-header--compact">
+        <h1 className="page-title">Finances</h1>
+        <div className="page-header-meta">
           <p className="page-subtitle">Accounts, budgets and spending</p>
+          <button 
+            className="btn-primary" 
+            onClick={() => setShowManagePanel(prev => !prev)}
+            style={{ fontSize: 'var(--text-xs)' }}
+          >
+            {showManagePanel ? "Close connections" : "Connections"}
+          </button>
         </div>
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowManagePanel(prev => !prev)}
-          style={{ fontSize: 'var(--text-xs)' }}
-        >
-          {showManagePanel ? "Close connections" : "Connections"}
-        </button>
       </header>
 
       {/* Natural Language AI Transaction Logger (qwen2.5-coder:3b) */}

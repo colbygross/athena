@@ -668,13 +668,11 @@ function RenderBrief({ content }) {
 function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingBrief, handleGenerateBrief }) {
   return (
     <div>
-      <header className="page-header" style={{ marginBottom: '1.5rem' }}>
+      <header className="page-header page-header--brief">
         <div className="page-header-inner">
-          <div>
-            <h1 className="page-title">Daily brief</h1>
-            <p className="page-subtitle">Intelligence Log: Diurnal Recaps</p>
-          </div>
+          <h1 className="page-title">Daily brief</h1>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <p className="page-subtitle" style={{ margin: 0 }}>Intelligence Log: Diurnal Recaps</p>
             {briefsList.length > 0 && (
               <select
                 className="form-input"

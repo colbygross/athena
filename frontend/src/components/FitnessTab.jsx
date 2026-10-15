@@ -594,15 +594,11 @@ function FitnessTab({
 
   return (
     <div>
-      <header className="page-header" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="page-title">Health</h1>
-            <p className="page-subtitle">Training program</p>
-          </div>
-          <div style={{ textAlign: 'right', fontFamily: 'inherit', fontSize: 'var(--text-xs)', color: 'var(--accent-green)' }}>
-            <span>TODAY: {weeklySplit[todayIdx].dayName.toUpperCase()}</span>
-          </div>
+      <header className="page-header page-header--compact">
+        <h1 className="page-title">Health</h1>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Training program</p>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--accent-green)' }}>TODAY: {weeklySplit[todayIdx].dayName.toUpperCase()}</span>
         </div>
       </header>
 
@@ -650,13 +646,14 @@ function FitnessTab({
                 <button
                   key={idx}
                   onClick={() => setSelectedDayIdx(idx)}
-                  className={`btn-secondary ${isSelected ? 'active' : ''}`}
+                  className={`btn-secondary day-select-btn ${isSelected ? 'active' : ''}`}
                   style={{
+                    '--day-btn-color': isSelected ? 'var(--accent-green)' : isToday ? 'var(--accent-yellow)' : 'var(--text-primary)',
                     padding: '0.6rem 0.3rem',
                     fontSize: 'var(--text-xs)',
                     border: isSelected ? '2px solid var(--accent-green)' : isToday ? '1px solid var(--accent-yellow)' : '1px solid var(--border-glass)',
                     background: isSelected ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'rgba(0,0,0,0.2)',
-                    color: isSelected ? 'var(--accent-green)' : isToday ? 'var(--accent-yellow)' : 'var(--text-primary)',
+                    color: 'var(--day-btn-color)',
                     cursor: 'pointer',
                     position: 'relative'
                   }}

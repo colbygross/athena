@@ -252,12 +252,10 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas, showToast
 
   return (
     <div>
-      <header className="page-header" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <h1 className="page-title">Career</h1>
-            <p className="page-subtitle">Priority 1: Income</p>
-          </div>
+      <header className="page-header page-header--compact">
+        <h1 className="page-title">Career</h1>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Priority 1: Income</p>
           <button 
             onClick={handleTriggerScrape} 
             disabled={scraping} 

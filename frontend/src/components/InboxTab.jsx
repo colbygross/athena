@@ -8,9 +8,11 @@ function InboxTab({
 }) {
   return (
     <div>
-      <header className="page-header">
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Inbox</h1>
-        <p className="page-subtitle">Sync and review incoming files</p>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Sync and review incoming files</p>
+        </div>
       </header>
 
       <div className="grid-equal-2col">

@@ -16,9 +16,11 @@ function AreasTab({
 }) {
   return (
     <div>
-      <header className="page-header">
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Areas</h1>
-        <p className="page-subtitle">Obsidian Vault: Life Domains</p>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Obsidian Vault: Life Domains</p>
+        </div>
       </header>
 
       <div className="grid-scheduler">
