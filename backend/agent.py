@@ -10,6 +10,7 @@ import urllib.request
 import urllib.error
 import tempfile
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dotenv import load_dotenv
 from database import get_db_connection, init_db
 
@@ -1319,6 +1320,81 @@ def get_google_calendar_service():
         print(f"Error building Google Calendar service: {e}")
         return None
 
+# Athena stores event times as naive local wall-clock strings ('YYYY-MM-DD HH:MM:SS').
+# Google uses RFC3339 with an offset, so every crossing of that boundary goes through the helpers below.
+ATHENA_TIME_FMT = "%Y-%m-%d %H:%M:%S"
+
+def get_local_zone():
+    """
+    Return (iana_name_or_None, tzinfo) for the zone Athena's local times are in.
+    Order: ATHENA_TIMEZONE env var, then the system zone via tzlocal, then the current fixed offset (ignores DST).
+    """
+    env_name = os.getenv("ATHENA_TIMEZONE", "").strip()
+    if env_name:
+        try:
+            return env_name, ZoneInfo(env_name)
+        except ZoneInfoNotFoundError:
+            print(f"Warning: ATHENA_TIMEZONE='{env_name}' is not a valid IANA zone; using system zone.")
+    try:
+        from tzlocal import get_localzone, get_localzone_name
+        return get_localzone_name(), get_localzone()
+    except Exception:
+        return None, datetime.now().astimezone().tzinfo
+
+def parse_athena_datetime(value):
+    """
+    Parse an Athena time ('YYYY-MM-DD HH:MM[:SS]', space or 'T' separator) into a naive local datetime.
+    Values with an explicit offset or 'Z' are converted to local time first.
+    """
+    s = value.strip().replace(" ", "T")
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(get_local_zone()[1]).replace(tzinfo=None)
+    return dt
+
+def normalize_athena_time(value):
+    """Return the canonical stored form 'YYYY-MM-DD HH:MM:SS' for an Athena time string."""
+    return parse_athena_datetime(value).strftime(ATHENA_TIME_FMT)
+
+def _to_rfc3339(local_dt):
+    """Attach the local zone to a naive local datetime and format it as RFC3339 with offset."""
+    return local_dt.replace(tzinfo=get_local_zone()[1]).isoformat()
+
+def _google_time(value):
+    """Build a Google 'start'/'end' object from an Athena local time string."""
+    body = {'dateTime': _to_rfc3339(parse_athena_datetime(value))}
+    tz_name = get_local_zone()[0]
+    if tz_name:
+        body['timeZone'] = tz_name
+    return body
+
+def google_time_to_athena(value):
+    """Convert a Google RFC3339 dateTime (with offset) to naive local 'YYYY-MM-DD HH:MM:SS'."""
+    return parse_athena_datetime(value).strftime(ATHENA_TIME_FMT)
+
+def _google_event_span(ev):
+    """
+    Return (start_str, end_str) in Athena local time, or None if the item has no start.
+    All-day events: Google's end.date is exclusive, so the last day covered is end.date - 1.
+    """
+    start = ev.get('start') or {}
+    end = ev.get('end') or {}
+    if start.get('dateTime'):
+        start_str = google_time_to_athena(start['dateTime'])
+        end_str = google_time_to_athena(end['dateTime']) if end.get('dateTime') else start_str
+        return start_str, end_str
+    if start.get('date'):
+        first_day = datetime.fromisoformat(start['date']).date()
+        if end.get('date'):
+            last_day = datetime.fromisoformat(end['date']).date() - timedelta(days=1)
+        else:
+            last_day = first_day
+        last_day = max(last_day, first_day)
+        return f"{first_day.isoformat()} 00:00:00", f"{last_day.isoformat()} 23:59:59"
+    return None
+
 def push_event_to_google(title, description, start_time, end_time):
     """
     Push a new event to Google Calendar. Returns google event id if successful, else None.
@@ -1327,17 +1403,11 @@ def push_event_to_google(title, description, start_time, end_time):
     if not service:
         return None
     try:
-        def to_iso(t_str):
-            s = t_str.strip().replace(" ", "T")
-            if len(s) == 16: # YYYY-MM-DDTHH:MM
-                s += ":00"
-            return s
-
         event_body = {
             'summary': title,
             'description': description or '',
-            'start': {'dateTime': to_iso(start_time), 'timeZone': 'UTC'},
-            'end': {'dateTime': to_iso(end_time), 'timeZone': 'UTC'}
+            'start': _google_time(start_time),
+            'end': _google_time(end_time)
         }
         created = service.events().insert(calendarId='primary', body=event_body).execute()
         return created.get('id')
@@ -1355,17 +1425,11 @@ def update_event_in_google(event_uid, title, description, start_time, end_time):
     if not service:
         return False
     try:
-        def to_iso(t_str):
-            s = t_str.strip().replace(" ", "T")
-            if len(s) == 16:
-                s += ":00"
-            return s
-
         event_body = {
             'summary': title,
             'description': description or '',
-            'start': {'dateTime': to_iso(start_time), 'timeZone': 'UTC'},
-            'end': {'dateTime': to_iso(end_time), 'timeZone': 'UTC'}
+            'start': _google_time(start_time),
+            'end': _google_time(end_time)
         }
         service.events().patch(calendarId='primary', eventId=event_uid, body=event_body).execute()
         return True
@@ -1389,64 +1453,75 @@ def delete_event_from_google(event_uid):
         print(f"Error deleting event from Google Calendar: {e}")
         return False
 
-def sync_google_calendar():
+def fetch_google_calendar_events(window_start, window_end):
+    """
+    Return all Google event items overlapping [window_start, window_end) (naive local datetimes),
+    following nextPageToken. Cancelled items are included (showDeleted=True); the caller drops them.
+    Returns None on any failure, so an outage is never mistaken for an empty calendar.
+    """
     service = get_google_calendar_service()
     if not service:
-        return []
+        return None
+    time_min = _to_rfc3339(window_start)
+    time_max = _to_rfc3339(window_end)
+    items = []
+    page_token = None
     try:
-        time_min = (datetime.utcnow() - timedelta(days=30)).isoformat() + 'Z'
-        time_max = (datetime.utcnow() + timedelta(days=60)).isoformat() + 'Z'
-        
         print('Fetching events from Google Calendar...')
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-        return events_result.get('items', [])
+        while True:
+            params = {
+                'calendarId': 'primary',
+                'timeMin': time_min,
+                'timeMax': time_max,
+                'singleEvents': True,
+                'showDeleted': True,
+                'orderBy': 'startTime',
+            }
+            if page_token:
+                params['pageToken'] = page_token
+            result = service.events().list(**params).execute()
+            items.extend(result.get('items', []))
+            page_token = result.get('nextPageToken')
+            if not page_token:
+                return items
     except Exception as e:
         print(f"Error fetching Google Calendar events: {e}")
-        return []
+        return None
 
 def sync_google_calendar_to_db():
-    google_events = sync_google_calendar()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if not google_events:
+    """
+    Pull Google Calendar events for the rolling window (-30 to +60 days) into calendar_events.
+    Conflicts are resolved last-write-wins from Google: a local edit to a synced event is overwritten on the next pull.
+    Rows with source='google' inside the window that Google no longer returns (deleted or cancelled) are removed,
+    and any tasks attached to them are detached. Skipped entirely if the fetch fails.
+    """
+    now = datetime.now()
+    window_start = now - timedelta(days=30)
+    window_end = now + timedelta(days=60)
+
+    google_events = fetch_google_calendar_events(window_start, window_end)
+    if google_events is None:
         return
-        
+
+    now_str = now.strftime(ATHENA_TIME_FMT)
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     try:
+        seen_uids = set()
         count = 0
         for ev in google_events:
+            if ev.get('status') == 'cancelled' or not ev.get('id'):
+                continue
+            span = _google_event_span(ev)
+            if not span:
+                continue
+            start_str, end_str = span
             title = ev.get('summary', 'No Title')
             description = ev.get('description', '')
-            
-            start = ev.get('start', {})
-            end = ev.get('end', {})
-            
-            start_time = start.get('dateTime') or start.get('date')
-            end_time = end.get('dateTime') or end.get('date')
-            
-            if not start_time:
-                continue
-                
-            def clean_iso(iso_str):
-                if 'T' in iso_str:
-                    parts = iso_str.split('T')
-                    date_part = parts[0]
-                    time_part = parts[1].split('-')[0].split('+')[0].split('Z')[0]
-                    return f"{date_part} {time_part}"
-                else:
-                    return f"{iso_str} 00:00:00"
-                    
-            start_str = clean_iso(start_time)
-            end_str = clean_iso(end_time) if end_time else start_str
-            
-            cursor.execute("SELECT id, tags, color FROM calendar_events WHERE event_uid = ?", (ev['id'],))
+            seen_uids.add(ev['id'])
+
+            cursor.execute("SELECT id FROM calendar_events WHERE event_uid = ?", (ev['id'],))
             existing = cursor.fetchone()
             if existing:
                 cursor.execute("""
@@ -1456,14 +1531,25 @@ def sync_google_calendar_to_db():
                 """, (title, description, start_str, end_str, now_str, existing['id']))
             else:
                 cursor.execute("""
-                    INSERT INTO calendar_events 
-                    (title, description, start_time, end_time, source, event_uid, tags, color, synced_at) 
+                    INSERT INTO calendar_events
+                    (title, description, start_time, end_time, source, event_uid, tags, color, synced_at)
                     VALUES (?, ?, ?, ?, 'google', ?, '[]', '#4facfe', ?)
                 """, (title, description, start_str, end_str, ev['id'], now_str))
             count += 1
-            
+
+        # Remove Google-sourced rows inside the window that were not returned (deleted or cancelled in Google).
+        # Explicitly detach tasks first so the removal does not depend on foreign-key enforcement.
+        cursor.execute(
+            "SELECT id, event_uid FROM calendar_events WHERE source = 'google' AND start_time >= ? AND start_time < ?",
+            (window_start.strftime(ATHENA_TIME_FMT), window_end.strftime(ATHENA_TIME_FMT))
+        )
+        stale_ids = [row['id'] for row in cursor.fetchall() if row['event_uid'] not in seen_uids]
+        for stale_id in stale_ids:
+            cursor.execute("UPDATE tasks SET event_id = NULL WHERE event_id = ?", (stale_id,))
+            cursor.execute("DELETE FROM calendar_events WHERE id = ?", (stale_id,))
+
         conn.commit()
-        print(f"Synced {count} Google Calendar events to database.")
+        print(f"Synced {count} Google Calendar events to database; removed {len(stale_ids)} stale events.")
     except Exception as e:
         conn.rollback()
         print(f"Error syncing Google Calendar to database: {e}")
