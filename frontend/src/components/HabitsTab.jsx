@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { HABITS } from '../constants';
 
 function HabitsTab({ habitsData, handleFormSubmit, renderRelatedAreas }) {
   const getInitialFormState = () => ({
@@ -72,11 +73,7 @@ function HabitsTab({ habitsData, handleFormSubmit, renderRelatedAreas }) {
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                   <label className="form-label">Habit Name</label>
                   <select className="form-select" value={habitForm.habit_name} onChange={e => setHabitForm({...habitForm, habit_name: e.target.value})}>
-                    <option value="Code 1 Hour">Code 1 Hour</option>
-                    <option value="Read 10 pages">Read 10 pages</option>
-                    <option value="Workout">Workout</option>
-                    <option value="Drink 3L Water">Drink 3L Water</option>
-                    <option value="Sleep 8 hours">Sleep 8 hours</option>
+                    {HABITS.map(h => <option key={h} value={h}>{h}</option>)}
                   </select>
                 </div>
                 <div className="form-group" style={{ marginBottom: '1rem' }}>

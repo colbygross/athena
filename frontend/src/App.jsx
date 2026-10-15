@@ -114,7 +114,8 @@ function App() {
   const [careerData, setCareerData] = useState(null);
   const [habitsData, setHabitsData] = useState(null);
   const [agentStatus, setAgentStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
+  const [dataError, setDataError] = useState(false); // overview, tasks or calendar failed to load
   const [tasksData, setTasksData] = useState([]);
   const [calendarData, setCalendarData] = useState([]);
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -365,12 +366,17 @@ function App() {
 
   const fetchAllData = async () => {
     setLoading(true);
+    // Rejects on HTTP errors so a failed request is not mistaken for an empty one.
+    const fetchJson = (url) => fetch(url).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    });
     try {
       const financesUrl = `${API_BASE}/finances?${filterAccount ? `account_id=${filterAccount}&` : ''}${filterDateRange ? `date_range=${filterDateRange}&` : ''}`;
       const [ovRes, finRes, fitRes, hlhRes, mealsRes, mindRes, lrnRes, carRes, habRes, agtRes, tskRes, calRes, briefListRes, projRes, resRes, areasRes] = await Promise.all([
-        fetch(`${API_BASE}/overview`).then(r => r.json()).catch(err => {
+        fetchJson(`${API_BASE}/overview`).catch(err => {
           console.error("Failed to fetch overview:", err);
-          return { monthly_expense: 0.0, weekly_workouts: 0, weekly_learning_hours: 0.0, active_jobs: 0, recent_transactions: [], recent_files: [], todays_habits: [] };
+          return null;
         }),
         fetch(financesUrl).then(r => r.json()).catch(err => {
           console.error("Failed to fetch finances:", err);
@@ -408,13 +414,13 @@ function App() {
           console.error("Failed to fetch agent status:", err);
           return { status: "idle", inbox_count: 0, inbox_files: [] };
         }),
-        fetch(`${API_BASE}/tasks`).then(r => r.json()).catch(err => {
+        fetchJson(`${API_BASE}/tasks`).catch(err => {
           console.error("Failed to fetch tasks:", err);
-          return { tasks: [] };
+          return null;
         }),
-        fetch(`${API_BASE}/calendar`).then(r => r.json()).catch(err => {
+        fetchJson(`${API_BASE}/calendar`).catch(err => {
           console.error("Failed to fetch calendar:", err);
-          return { events: [] };
+          return null;
         }),
         fetch(`${API_BASE}/daily-briefs`).then(r => r.json()).catch(err => {
           console.error("Failed to fetch daily-briefs:", err);
@@ -434,7 +440,8 @@ function App() {
         })
       ]);
 
-      setOverviewData(ovRes);
+      setDataError(!ovRes || !tskRes || !calRes);
+      if (ovRes) setOverviewData(ovRes);
       setFinancesData(finRes);
       setFitnessData(fitRes);
       setHealthData(hlhRes);
@@ -444,8 +451,8 @@ function App() {
       setCareerData(carRes);
       setHabitsData(habRes);
       setAgentStatus(agtRes);
-      setTasksData(tskRes.tasks || []);
-      setCalendarData(calRes.events || []);
+      if (tskRes) setTasksData(tskRes.tasks || []);
+      if (calRes) setCalendarData(calRes.events || []);
       
       const projs = projRes.projects || [];
       setProjectsList(projs);
@@ -659,14 +666,6 @@ function App() {
     return `obsidian://open?vault=obsidian_vault&file=${encodeURIComponent(cleanPath)}`;
   };
 
-  if (loading && !overviewData) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', fontFamily: 'var(--font-mono)' }}>
-        <h2 style={{ color: 'var(--text-secondary)' }}>Establishing link with Athena...</h2>
-      </div>
-    );
-  }
-
   return (
     <div className="dashboard-container">
       {/* Navigation: sidebar on desktop, tab bar on phones */}
@@ -720,9 +719,18 @@ function App() {
         {activeTab === 'overview' && (
           <OverviewTab
             overviewData={overviewData}
-            setActiveTab={setActiveTab}
+            tasksData={tasksData}
+            calendarData={calendarData}
+            selectedBrief={selectedBrief}
+            dailyBriefsList={dailyBriefsList}
+            dataError={dataError}
+            toggleTask={toggleTask}
+            fetchAllData={fetchAllData}
+            setActiveTab={navigateToTab}
             fileUrl={fileUrl}
             handleFormSubmit={handleFormSubmit}
+            showToast={showToast}
+            API_BASE={API_BASE}
           />
         )}
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import QuickLog from './QuickLog';
 
 function FinancesTab({
   financesData,
@@ -14,8 +15,6 @@ function FinancesTab({
   setActiveTab
 }) {
   const [showManagePanel, setShowManagePanel] = useState(false);
-  const [nlpInput, setNlpInput] = useState('');
-  const [nlpLoading, setNlpLoading] = useState(false);
 
   // Tab-specific form states
   const [txForm, setTxForm] = useState({
@@ -171,32 +170,6 @@ function FinancesTab({
     }
   };
 
-  const handleNlpSubmit = async (e) => {
-    e.preventDefault();
-    if (!nlpInput.trim()) return;
-    setNlpLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/finances/log-nlp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: nlpInput.trim() })
-      }).then(r => r.json());
-
-      if (res.status === 'success') {
-        const p = res.parsed;
-        showToast(`✓ Logged: $${p.amount.toFixed(2)} at ${p.merchant} (${p.category})`, "success");
-        setNlpInput('');
-        fetchAllData();
-      } else {
-        showToast("Error: " + (res.detail || "Failed to parse transaction"), "error");
-      }
-    } catch (err) {
-      showToast("Error logging natural language transaction: " + err, "error");
-    } finally {
-      setNlpLoading(false);
-    }
-  };
-
   if (!financesData) return null;
 
   return (
@@ -216,33 +189,7 @@ function FinancesTab({
       </header>
 
       {/* Natural Language AI Transaction Logger (qwen2.5-coder:3b) */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', border: '1px solid var(--border-cyan)', background: 'var(--bg-surface)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--accent-cyan)' }} aria-hidden="true">auto_awesome</span>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-            NATURAL LANGUAGE LOG // qwen2.5-coder:3b
-          </span>
-        </div>
-        <form onSubmit={handleNlpSubmit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            className="form-input"
-            style={{ flex: 1, minWidth: '240px', padding: '0.5rem 0.8rem', fontSize: '0.85rem' }}
-            placeholder='e.g. "Spent $14.50 at Chipotle on lunch with cash" or "Moved $100 from Checking to Savings yesterday"'
-            value={nlpInput}
-            onChange={e => setNlpInput(e.target.value)}
-            disabled={nlpLoading}
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '0.5rem 1.2rem', minWidth: '110px' }}
-            disabled={nlpLoading || !nlpInput.trim()}
-          >
-            {nlpLoading ? "Parsing..." : "Log Entry"}
-          </button>
-        </form>
-      </div>
+      <QuickLog API_BASE={API_BASE} showToast={showToast} onLogged={fetchAllData} />
 
       {/* Overall Wealth Section */}
       <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', border: '1px solid var(--accent-cyan)' }}>
