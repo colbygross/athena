@@ -3030,7 +3030,7 @@ h2, h3, h4, h5, h6 {
 /* Shared: the quick log also renders on Finances */
 .quick-log {
   padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
+  margin: 1.5rem 0;
   border: 1px solid var(--border-cyan);
   background: var(--bg-surface);
 }
