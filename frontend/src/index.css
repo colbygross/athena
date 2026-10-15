@@ -59,7 +59,7 @@
   --focus-ring: #C4956F; /* lighter wood, 7.9:1 on #000 */
 
   --border-radius: 0.75rem; /* softer, rounder corners */
-  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
   --shadow-premium: none;
 
   /* Status colors: distinct hues so errors and overruns never read as body text */
@@ -2377,7 +2377,6 @@ h2, h3, h4, h5, h6 {
 
 .timeline-event-card:hover {
   background: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
 }
 
 .timeline-gap-block {
