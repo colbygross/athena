@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NAV_SECTIONS, navLabel } from '../nav';
 
 function Sidebar({
@@ -10,6 +10,14 @@ function Sidebar({
   inboxCount,
   logoSrc
 }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const timeString = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateString = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
   return (
     <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Main">
       <div className="logo-container">
@@ -28,6 +36,13 @@ function Sidebar({
           </span>
         </button>
       </div>
+
+      {!sidebarCollapsed && (
+        <div className="sidebar-clock" aria-hidden="true">
+          <span className="sidebar-clock-time">{timeString}</span>
+          <span className="sidebar-clock-date">{dateString}</span>
+        </div>
+      )}
 
       <div className="nav-sections">
         {NAV_SECTIONS.map(section => (

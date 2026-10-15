@@ -3419,3 +3419,30 @@ h2, h3, h4, h5, h6 {
   margin-right: 0.35rem;
   background: var(--event-color, var(--text-muted));
 }
+
+/* Display titles keep the wide-set display treatment; body labels stay sentence case */
+h1,
+.page-title,
+.logo-text {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0 0.5rem 1.25rem;
+  color: var(--text-muted);
+}
+
+.sidebar-clock-time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+}
+
+.sidebar-clock-date {
+  font-size: var(--text-xs);
+}
