@@ -907,7 +907,7 @@ def process_inbox():
         os.makedirs(INBOX_DIR)
         return []
         
-    files = [f for f in os.listdir(INBOX_DIR) if os.path.isfile(os.path.join(INBOX_DIR, f))]
+    files = [f for f in os.listdir(INBOX_DIR) if os.path.isfile(os.path.join(INBOX_DIR, f)) and not f.startswith('.')]
     processed = []
     
     if not files:

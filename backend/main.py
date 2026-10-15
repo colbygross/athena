@@ -2194,7 +2194,7 @@ def get_agent_status():
     
     inbox_files = []
     if os.path.exists(agent.INBOX_DIR):
-        inbox_files = [f for f in os.listdir(agent.INBOX_DIR) if os.path.isfile(os.path.join(agent.INBOX_DIR, f))]
+        inbox_files = [f for f in os.listdir(agent.INBOX_DIR) if os.path.isfile(os.path.join(agent.INBOX_DIR, f)) and not f.startswith('.')]
         
     return {
         "status": "running" if agent_running else "idle",
