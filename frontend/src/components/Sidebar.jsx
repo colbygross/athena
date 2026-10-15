@@ -1,48 +1,15 @@
 import React from 'react';
-
-const NAV_ITEMS = [
-  { id: 'overview', icon: 'dashboard', label: 'Overview', accent: 'cyan' },
-  { id: 'daily-briefs', icon: 'description', label: 'Daily Briefs', accent: 'cyan' },
-  { id: 'projects', icon: 'folder', label: 'Projects Workspace', accent: 'purple' },
-  { id: 'areas', icon: 'folder_shared', label: 'Areas Explorer', accent: 'purple' },
-  { id: 'resources', icon: 'folder_special', label: 'Resources Vault', accent: 'purple' },
-  { id: 'calendar-tasks', icon: 'calendar_today', label: 'Calendar & Tasks', accent: 'cyan' },
-  { id: 'finances', icon: 'attach_money', label: 'Finances', accent: 'pink' },
-  { id: 'fitness', icon: 'favorite', label: 'Health & Fitness', accent: 'green' },
-  { id: 'learning', icon: 'school', label: 'Learning Tracker', accent: 'purple' },
-  { id: 'career', icon: 'work', label: 'Career Tracker', accent: 'yellow' },
-  { id: 'habits', icon: 'sync', label: 'Habit Streaks', accent: 'green' },
-  { id: 'inbox', icon: 'move_to_inbox', label: 'Athena Uplink', accent: 'cyan' },
-];
+import { NAV_SECTIONS, navLabel } from '../nav';
 
 function Sidebar({
   sidebarCollapsed,
   toggleSidebar,
-  currentTime,
   activeTab,
   setActiveTab,
-  theme,
-  cycleTheme,
-  isFullscreen,
-  toggleFullscreen,
-  setShowApiKeyModal,
+  openSettings,
   inboxCount,
   logoSrc
 }) {
-  const shortTimeString = currentTime.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: sidebarCollapsed ? undefined : '2-digit',
-    hour12: true
-  });
-
-  const dateString = currentTime.toLocaleDateString(undefined, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }).toUpperCase();
-
   return (
     <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Main">
       <div className="logo-container">
@@ -61,81 +28,41 @@ function Sidebar({
           </span>
         </button>
       </div>
-      
-      <div className="system-clock-panel" aria-hidden="true">
-        <div className="clock-time">
-          {shortTimeString}
-        </div>
-        <div className="clock-date">{dateString}</div>
+
+      <div className="nav-sections">
+        {NAV_SECTIONS.map(section => (
+          <div className="nav-section" key={section.id}>
+            <h2 className={sidebarCollapsed ? 'nav-section-label sr-only' : 'nav-section-label'} id={`nav-section-${section.id}`}>
+              {section.label}
+            </h2>
+            <ul className="nav-links" aria-labelledby={`nav-section-${section.id}`}>
+              {section.items.map(item => {
+                const text = navLabel(item, inboxCount);
+                const isActive = activeTab === item.id;
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={`nav-item ${item.accent} ${isActive ? 'active' : ''}`}
+                      onClick={() => setActiveTab(item.id)}
+                      aria-current={isActive ? 'page' : undefined}
+                      aria-label={text}
+                      title={sidebarCollapsed ? text : undefined}
+                    >
+                      <span className="material-symbols-outlined nav-icon" aria-hidden="true">{item.icon}</span>
+                      <span className="nav-text">{item.label}</span>
+                      {item.id === 'inbox' && inboxCount > 0 && (
+                        <span className="nav-badge" aria-hidden="true">{inboxCount}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </div>
-      
-      <ul className="nav-links">
-        {NAV_ITEMS.map(({ id, icon, label, accent }) => {
-          const text = id === 'inbox' ? `${label} (${inboxCount})` : label;
-          return (
-            <li key={id}>
-              <button
-                type="button"
-                className={`nav-item ${accent} ${activeTab === id ? 'active' : ''}`}
-                onClick={() => setActiveTab(id)}
-                aria-current={activeTab === id ? 'page' : undefined}
-                aria-label={text}
-                title={sidebarCollapsed ? text : undefined}
-              >
-                <span className="material-symbols-outlined nav-icon" aria-hidden="true">{icon}</span>
-                <span className="nav-text">{text}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      
-      <div className="sidebar-toggles">
-        <button
-          className={`fullscreen-toggle-btn ${theme}`}
-          onClick={toggleFullscreen}
-          title="Toggle Fullscreen Mode"
-          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">
-            {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
-          </span>
-          {!sidebarCollapsed && <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}</span>}
-        </button>
-        
-        <button
-          className={`theme-toggle-btn ${theme}`}
-          onClick={cycleTheme}
-          title={`Current theme: ${theme}. Click to cycle.`}
-          aria-label={`Theme: ${theme.replace('-', ' ')}. Switch theme`}
-        >
-          {theme.includes('dark') ? (
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">dark_mode</span>
-          ) : (
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">light_mode</span>
-          )}
-          
-          {!sidebarCollapsed && (
-            <>
-              <div className="toggle-track">
-                <div className="toggle-thumb" />
-              </div>
-              <span style={{ textTransform: 'capitalize' }}>{theme.replace('-', ' ')}</span>
-            </>
-          )}
-        </button>
-        
-        <button
-          className={`theme-toggle-btn ${theme}`}
-          onClick={() => setShowApiKeyModal(true)}
-          title="Configure secure API credentials connection"
-          aria-label="API connection settings"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">vpn_key</span>
-          {!sidebarCollapsed && <span>API Connection</span>}
-        </button>
-      </div>
-      
+
       <div className="sidebar-footer">
         <div className="user-avatar" aria-hidden="true">CS</div>
         <div className="user-info">
@@ -146,6 +73,16 @@ function Sidebar({
             [ATHENA_LINK_ON]
           </span>
         </div>
+        <button
+          type="button"
+          className="sidebar-settings-btn"
+          onClick={openSettings}
+          aria-label="Settings"
+          title="Settings"
+          aria-haspopup="dialog"
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">settings</span>
+        </button>
       </div>
     </nav>
   );

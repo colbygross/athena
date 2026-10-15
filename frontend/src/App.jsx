@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import archerAnarchyLogo from './assets/archer_anarchy.svg';
 
-import ApiKeyModal from './components/ApiKeyModal';
+import SettingsDialog from './components/SettingsDialog';
+import MobileTabBar from './components/MobileTabBar';
 import OverviewTab from './components/OverviewTab';
 import FinancesTab from './components/FinancesTab';
 import FitnessTab from './components/FitnessTab';
@@ -49,14 +50,20 @@ window.fetch = async function (input, init) {
 
 function App() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('athena-theme') || 'stark-dark';
+  // 'system' follows prefers-color-scheme; 'stark-dark' / 'stark-light' are manual overrides set in Settings.
+  const [appearance, setAppearance] = useState(() => {
+    const saved = localStorage.getItem('athena-appearance');
+    return ['system', 'stark-dark', 'stark-light'].includes(saved) ? saved : 'system';
   });
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+  const theme = appearance === 'system' ? (systemPrefersDark ? 'stark-dark' : 'stark-light') : appearance;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem('athena-api-key') || '');
+  const [showSettings, setShowSettings] = useState(false);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(prev => {
@@ -65,8 +72,6 @@ function App() {
       return next;
     });
   };
-
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Mobile / Touchscreen device detection
   const [isMobile, setIsMobile] = useState(() => {
@@ -92,10 +97,10 @@ function App() {
   }, [isMobile]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e) => setSystemPrefersDark(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
   }, []);
 
 
@@ -514,26 +519,22 @@ function App() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const cycleTheme = () => {
-    setTheme(current => {
-      if (current === 'stark-dark') return 'stark-light';
-      if (current === 'stark-light') return 'soft-dark';
-      if (current === 'soft-dark') return 'soft-light';
-      return 'stark-dark';
-    });
-  };
-
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('stark-light', 'soft-dark', 'soft-light', 'stark-dark', 'light-mode');
     if (theme !== 'stark-dark') {
       root.classList.add(theme);
     }
-    if (theme === 'stark-light' || theme === 'soft-light') {
+    if (theme === 'stark-light') {
       root.classList.add('light-mode');
     }
-    localStorage.setItem('athena-theme', theme);
+    root.style.colorScheme = theme === 'stark-light' ? 'light' : 'dark';
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('athena-appearance', appearance);
+    localStorage.removeItem('athena-theme');
+  }, [appearance]);
 
   useEffect(() => {
     fetchAllData();
@@ -668,21 +669,25 @@ function App() {
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        sidebarCollapsed={sidebarCollapsed}
-        toggleSidebar={toggleSidebar}
-        currentTime={currentTime}
-        activeTab={activeTab}
-        setActiveTab={navigateToTab}
-        theme={theme}
-        cycleTheme={cycleTheme}
-        isFullscreen={isFullscreen}
-        toggleFullscreen={toggleFullscreen}
-        setShowApiKeyModal={setShowApiKeyModal}
-        inboxCount={agentStatus?.inbox_count || 0}
-        logoSrc={archerAnarchyLogo}
-      />
+      {/* Navigation: sidebar on desktop, tab bar on phones */}
+      {isMobile ? (
+        <MobileTabBar
+          activeTab={activeTab}
+          setActiveTab={navigateToTab}
+          openSettings={() => setShowSettings(true)}
+          inboxCount={agentStatus?.inbox_count || 0}
+        />
+      ) : (
+        <Sidebar
+          sidebarCollapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+          activeTab={activeTab}
+          setActiveTab={navigateToTab}
+          openSettings={() => setShowSettings(true)}
+          inboxCount={agentStatus?.inbox_count || 0}
+          logoSrc={archerAnarchyLogo}
+        />
+      )}
 
       {/* Main Panel Content with Hologram Boot Flicker */}
       <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''} flicker-effect`} key={activeTab}>
@@ -871,11 +876,13 @@ function App() {
         ))}
       </div>
 
-      <ApiKeyModal
-        show={showApiKeyModal}
-        onClose={() => setShowApiKeyModal(false)}
-        apiKeyInput={apiKeyInput}
-        setApiKeyInput={setApiKeyInput}
+      <SettingsDialog
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        appearance={appearance}
+        setAppearance={setAppearance}
+        isFullscreen={isFullscreen}
+        toggleFullscreen={toggleFullscreen}
         showToast={showToast}
       />
     </div>
