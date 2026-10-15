@@ -90,9 +90,13 @@ This task coordinator reconciles the database task table state with checkboxes f
 4.  **Master Tasks Compiler**: Compiles all unresolved tasks and tasks finished in the last 24 hours into [obsidian_vault/tasks.md](../obsidian_vault/tasks.md) grouped by category.
 
 ### 3.2. Google Calendar Sync
-*   Checks for `token.json` and `credentials.json` credentials in `backend/`.
-*   Connects to Google Calendar API via OAuth2, fetching event items within a rolling viewport (-30 to +60 days).
-*   Merges Google events with database rows marked with `source = 'google'`.
+*   **Auth**: uses the OAuth token at `storage/token.json` (or `backend/token.json`). Create it by running `backend/setup_google_calendar.py`; the server never starts an OAuth flow itself. Without a usable token, sync reports *not connected* (HTTP 400). Refreshed tokens are written back to disk, and the API client is cached per process, so restart the server after re-authorizing.
+*   **Time zones**: Athena stores naive local wall-clock times. Pushes send RFC3339 with the local offset plus the IANA zone (`ATHENA_TIMEZONE`, falling back to the system zone via `tzlocal`). Pulls convert Google offsets to local time.
+*   **All-day events**: stored from `00:00:00` on the start date to `23:59:59` on the last day (Google's `end.date` is exclusive).
+*   **Pull window**: follows `nextPageToken` over a rolling viewport (-30 to +60 days) with `showDeleted=True`; cancelled items are dropped. Google-sourced rows inside the window that Google no longer returns are deleted, and tasks linked to them are detached. Nothing is deleted when the fetch fails.
+*   **Conflicts**: last write wins from Google. A local edit to a synced event is overwritten on the next pull.
+*   **Pending pushes**: an event created while Google rejects the push is saved with `google_pending = 1` and pushed at the start of the next sync. Edits to Google-sourced events are pushed first and saved locally only if Google accepts them.
+*   **Endpoint**: `POST /api/calendar/sync-google` returns `added`, `updated`, `deleted` and `pushed` counts, or 400 (not connected) / 502 (Google API error).
 
 ### 3.3. ICS Calendar Sync
 *   Synchronizes local calendar entries with the text-file schedule [obsidian_vault/calendar.ics](../obsidian_vault/calendar.ics).

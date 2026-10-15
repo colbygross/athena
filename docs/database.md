@@ -165,6 +165,10 @@ Event ledger synced from Google Calendar or local ICS schedules.
 *   `end_time` (DATETIME NOT NULL)
 *   `source` (TEXT CHECK(source IN ('google', 'local_ics')) DEFAULT 'local_ics')
 *   `event_uid` (TEXT UNIQUE) — Google Event ID or local ICS UID
+*   `tags` (TEXT DEFAULT '[]') — JSON array of tag strings
+*   `color` (TEXT DEFAULT '#4facfe')
+*   `synced_at` (DATETIME) — Last time the row was pulled from or pushed to Google
+*   `google_pending` (INTEGER DEFAULT 0) — `1` when the event was created locally and still needs pushing to Google; cleared by the next sync that succeeds
 *   `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
 
 ---
