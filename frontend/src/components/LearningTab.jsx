@@ -17,9 +17,11 @@ function LearningTab({ learningData, handleFormSubmit, renderRelatedAreas }) {
 
   return (
     <div>
-      <header className="page-header">
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Learning</h1>
-        <p className="page-subtitle">CS Study: Algorithms // Systems Breach</p>
+        <div className="page-header-meta">
+          <p className="page-subtitle">CS Study: Algorithms // Systems Breach</p>
+        </div>
       </header>
 
       <div className="grid-2col">

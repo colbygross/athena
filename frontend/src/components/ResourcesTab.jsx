@@ -16,9 +16,11 @@ function ResourcesTab({
 }) {
   return (
     <div>
-      <header className="page-header">
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Resources</h1>
-        <p className="page-subtitle">Obsidian Vault: Document Manager</p>
+        <div className="page-header-meta">
+          <p className="page-subtitle">Obsidian Vault: Document Manager</p>
+        </div>
       </header>
 
       <div className="grid-scheduler">

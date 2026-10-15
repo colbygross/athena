@@ -21,7 +21,12 @@ function Sidebar({
   return (
     <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Main">
       <div className="logo-container">
-        <img src={logoSrc} className="logo-icon" alt="Athena OS Logo" />
+        <span
+          className="logo-icon"
+          role="img"
+          aria-label="Athena OS Logo"
+          style={{ '--logo-url': `url(${logoSrc})` }}
+        />
         {!sidebarCollapsed && <span className="logo-text">ATHENA</span>}
         <button
           type="button"

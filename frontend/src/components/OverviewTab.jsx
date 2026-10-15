@@ -113,12 +113,14 @@ function OverviewTab({
 
   return (
     <div>
-      <header className="page-header">
-        <time className="page-date" dateTime={today}>
-          {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-        </time>
+      <header className="page-header page-header--compact">
         <h1 className="page-title">Overview</h1>
-        <p className="page-subtitle">{summary}</p>
+        <div className="page-header-meta">
+          <time className="page-date" dateTime={today}>
+            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          </time>
+          <p className="page-subtitle">{summary}</p>
+        </div>
       </header>
 
       {/* Today: the first thing on screen */}
