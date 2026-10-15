@@ -1,0 +1,10 @@
+// Shared between the Overview and Habits tabs so the habit list lives in one place.
+export const HABITS = ['Code 1 Hour', 'Read 10 pages', 'Workout', 'Drink 3L Water', 'Sleep 8 hours'];
+
+// Local calendar date as YYYY-MM-DD (toISOString would give the UTC date).
+export const formatLocalDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
