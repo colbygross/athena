@@ -17,7 +17,7 @@
 :root {
   /* Typography */
   --font-display: 'KH Interference', sans-serif;
-  --font-text: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-text: 'PP Fraktion Mono', monospace;
   --font-mono: 'PP Fraktion Mono', monospace;
 
   /* Type scale: five steps, 12px floor */
