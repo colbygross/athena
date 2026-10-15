@@ -191,10 +191,10 @@ function CalendarTasksTab({
       const res = await fetch(`${API_BASE}/calendar/sync-google`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'success') {
         setLastGoogleSync(res.synced_at || new Date().toLocaleTimeString());
-        showToast("Google Calendar synced successfully!", "success");
+        showToast(`Google Calendar synced: ${res.added} added, ${res.updated} updated, ${res.deleted} removed.`, "success");
         fetchAllData();
       } else {
-        showToast("Google Calendar sync: " + (res.detail || "Unable to sync"), "info");
+        showToast("Google Calendar sync failed: " + (res.detail || "Unable to sync"), "error");
       }
     } catch (err) {
       showToast("Error syncing Google Calendar: " + err, "error");

@@ -209,7 +209,8 @@ def test_sync_does_not_delete_anything_when_fetch_fails(tmp_db, ny_zone, svc):
     _insert_event("survivor1", start, end)
     svc.events.return_value.list.return_value.execute.side_effect = RuntimeError("Google is down")
 
-    agent.sync_google_calendar_to_db()
+    with pytest.raises(agent.GoogleCalendarAPIError):
+        agent.sync_google_calendar_to_db()
 
     uids = {r["event_uid"] for r in _rows("SELECT event_uid FROM calendar_events")}
     assert uids == {"survivor1"}
@@ -221,7 +222,131 @@ def test_sync_does_not_delete_when_not_connected(tmp_db, ny_zone, monkeypatch):
     _insert_event("survivor2", start, start)
     monkeypatch.setattr(agent, "get_google_calendar_service", lambda: None)
 
-    agent.sync_google_calendar_to_db()
+    with pytest.raises(agent.GoogleCalendarNotConnected):
+        agent.sync_google_calendar_to_db()
 
     uids = {r["event_uid"] for r in _rows("SELECT event_uid FROM calendar_events")}
     assert uids == {"survivor2"}
+
+
+# --- Item 5: server-side auth (no interactive OAuth, cached client, refreshed token written back) ---
+
+@pytest.fixture
+def storage(tmp_path, monkeypatch):
+    monkeypatch.setattr(agent, "STORAGE_DIR", str(tmp_path))
+    monkeypatch.setattr(agent, "BASE_DIR", str(tmp_path / "base"))
+    monkeypatch.setattr(agent, "_google_service", None)
+    return tmp_path
+
+
+def test_missing_token_returns_none_and_never_starts_oauth(storage, monkeypatch):
+    (storage / "credentials.json").write_text("{}")  # present, so the old code would have started a browser flow
+    flow_cls = MagicMock()
+    monkeypatch.setattr(agent, "InstalledAppFlow", flow_cls)
+
+    assert agent.get_google_calendar_service() is None
+
+    flow_cls.from_client_secrets_file.assert_not_called()
+    flow_cls.from_client_secrets_file.return_value.run_local_server.assert_not_called()
+
+
+def test_expired_token_is_refreshed_and_written_back(storage, monkeypatch):
+    token_path = storage / "token.json"
+    token_path.write_text('{"token": "stale"}')
+    creds = MagicMock(valid=False, expired=True, refresh_token="refresh-me")
+    creds.to_json.return_value = '{"token": "fresh"}'
+    monkeypatch.setattr(agent.Credentials, "from_authorized_user_file", MagicMock(return_value=creds))
+    build = MagicMock(return_value="SERVICE")
+    monkeypatch.setattr(agent, "build", build)
+
+    assert agent.get_google_calendar_service() == "SERVICE"
+
+    creds.refresh.assert_called_once()
+    assert token_path.read_text() == '{"token": "fresh"}'
+
+
+def test_failed_refresh_returns_none(storage, monkeypatch):
+    (storage / "token.json").write_text("{}")
+    creds = MagicMock(valid=False, expired=True, refresh_token="r")
+    creds.refresh.side_effect = Exception("revoked")
+    monkeypatch.setattr(agent.Credentials, "from_authorized_user_file", MagicMock(return_value=creds))
+    build = MagicMock()
+    monkeypatch.setattr(agent, "build", build)
+
+    assert agent.get_google_calendar_service() is None
+    build.assert_not_called()
+
+
+def test_service_is_built_once_and_cached(storage, monkeypatch):
+    (storage / "token.json").write_text("{}")
+    creds = MagicMock(valid=True)
+    monkeypatch.setattr(agent.Credentials, "from_authorized_user_file", MagicMock(return_value=creds))
+    build = MagicMock(return_value="SERVICE")
+    monkeypatch.setattr(agent, "build", build)
+
+    first = agent.get_google_calendar_service()
+    second = agent.get_google_calendar_service()
+
+    assert first == second == "SERVICE"
+    assert build.call_count == 1
+
+
+# --- Item 6: typed failures and sync result ---
+
+def test_sync_raises_not_connected_when_no_service(tmp_db, monkeypatch):
+    monkeypatch.setattr(agent, "get_google_calendar_service", lambda: None)
+    with pytest.raises(agent.GoogleCalendarNotConnected):
+        agent.sync_google_calendar_to_db()
+
+
+def test_sync_raises_api_error_on_fetch_failure(tmp_db, svc):
+    svc.events.return_value.list.return_value.execute.side_effect = RuntimeError("500 from Google")
+    with pytest.raises(agent.GoogleCalendarAPIError):
+        agent.sync_google_calendar_to_db()
+
+
+def test_sync_returns_counts(tmp_db, ny_zone, svc):
+    _insert_event("upd1", "2026-10-15 08:00:00", "2026-10-15 08:30:00")
+    svc.events.return_value.list.return_value.execute.return_value = {"items": [
+        {"id": "upd1", "summary": "Updated", "start": {"dateTime": "2026-10-15T09:00:00-04:00"},
+         "end": {"dateTime": "2026-10-15T10:00:00-04:00"}},
+        {"id": "new1", "summary": "New", "start": {"dateTime": "2026-10-15T11:00:00-04:00"},
+         "end": {"dateTime": "2026-10-15T12:00:00-04:00"}},
+    ]}
+
+    result = agent.sync_google_calendar_to_db()
+
+    assert result == {"connected": True, "added": 1, "updated": 1, "deleted": 0, "error": None}
+
+
+@pytest.fixture
+def api_client(tmp_db):
+    from fastapi.testclient import TestClient
+    from main import app
+    return TestClient(app)
+
+
+def test_sync_endpoint_reports_not_connected_as_400(api_client, monkeypatch):
+    monkeypatch.setattr(agent, "get_google_calendar_service", lambda: None)
+    res = api_client.post("/api/calendar/sync-google")
+    assert res.status_code == 400
+    assert "not connected" in res.json()["detail"].lower()
+
+
+def test_sync_endpoint_reports_api_error_as_502(api_client, svc):
+    svc.events.return_value.list.return_value.execute.side_effect = RuntimeError("quota exceeded")
+    res = api_client.post("/api/calendar/sync-google")
+    assert res.status_code == 502
+    assert "quota exceeded" in res.json()["detail"]
+
+
+def test_sync_endpoint_returns_counts_on_success(api_client, ny_zone, svc):
+    svc.events.return_value.list.return_value.execute.return_value = {"items": [
+        {"id": "ep1", "summary": "Endpoint", "start": {"dateTime": "2026-10-15T09:00:00-04:00"},
+         "end": {"dateTime": "2026-10-15T10:00:00-04:00"}},
+    ]}
+    res = api_client.post("/api/calendar/sync-google")
+    body = res.json()
+    assert res.status_code == 200
+    assert body["status"] == "success"
+    assert (body["added"], body["updated"], body["deleted"]) == (1, 0, 0)

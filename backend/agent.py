@@ -1266,11 +1266,32 @@ def sync_local_ics_to_db():
 
 GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+class GoogleCalendarError(Exception):
+    """Base class for Google Calendar sync failures."""
+
+class GoogleCalendarNotConnected(GoogleCalendarError):
+    """No usable Google token. Fix by running backend/setup_google_calendar.py."""
+
+class GoogleCalendarAPIError(GoogleCalendarError):
+    """Google rejected or failed a request."""
+
+GOOGLE_NOT_CONNECTED_MESSAGE = (
+    "Google Calendar is not connected. Run backend/setup_google_calendar.py to authorize it, then restart Athena."
+)
+
+# Cached Calendar API client; built once per process. Cleared only by restarting the server.
+_google_service = None
+
 def get_google_calendar_service():
     """
-    Authenticate and return Google Calendar API service instance if available.
+    Return the cached Google Calendar API client, or None if there is no usable token.
+    Never starts an interactive OAuth flow: that blocks inside the API process (and in Docker).
+    Authorize with backend/setup_google_calendar.py instead.
     """
-    creds = None
+    global _google_service
+    if _google_service is not None:
+        return _google_service
+
     token_candidates = [
         os.path.join(STORAGE_DIR, 'token.json'),
         os.path.join(BASE_DIR, 'storage', 'token.json'),
@@ -1278,47 +1299,38 @@ def get_google_calendar_service():
     ]
     token_path = next((p for p in token_candidates if os.path.exists(p)), token_candidates[0])
 
-    creds_candidates = [
-        os.path.join(STORAGE_DIR, 'credentials.json'),
-        os.path.join(BASE_DIR, 'storage', 'credentials.json'),
-        os.path.join(BASE_DIR, 'credentials.json')
-    ]
-    creds_path = next((p for p in creds_candidates if os.path.exists(p)), creds_candidates[0])
-    
-    if os.path.exists(token_path):
-        try:
-            creds = Credentials.from_authorized_user_file(token_path, GOOGLE_CALENDAR_SCOPES)
-        except Exception as e:
-            print(f"Error loading {token_path}: {e}")
-            
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-            except Exception as e:
-                print(f"Error refreshing Google Calendar credentials: {e}")
-                creds = None
-        else:
-            if os.path.exists(creds_path):
-                try:
-                    flow = InstalledAppFlow.from_client_secrets_file(creds_path, GOOGLE_CALENDAR_SCOPES)
-                    creds = flow.run_local_server(port=0)
-                    with open(token_path, 'w') as token:
-                        token.write(creds.to_json())
-                except Exception as e:
-                    print(f"Google Calendar OAuth flow failed: {e}. Skipping Google Calendar sync.")
-                    return None
-            else:
-                return None
-                
-    if not creds:
+    if not os.path.exists(token_path):
+        print(GOOGLE_NOT_CONNECTED_MESSAGE)
         return None
-        
+
     try:
-        return build('calendar', 'v3', credentials=creds)
+        creds = Credentials.from_authorized_user_file(token_path, GOOGLE_CALENDAR_SCOPES)
+    except Exception as e:
+        print(f"Error loading {token_path}: {e}")
+        return None
+
+    if not creds.valid:
+        if not (creds.expired and creds.refresh_token):
+            print(f"Google Calendar token at {token_path} is invalid and cannot be refreshed. {GOOGLE_NOT_CONNECTED_MESSAGE}")
+            return None
+        try:
+            creds.refresh(Request())
+        except Exception as e:
+            print(f"Error refreshing Google Calendar credentials: {e}. {GOOGLE_NOT_CONNECTED_MESSAGE}")
+            return None
+        # Persist the refreshed access token so the next process start does not need to refresh again.
+        try:
+            with open(token_path, 'w') as token:
+                token.write(creds.to_json())
+        except OSError as e:
+            print(f"Warning: could not save refreshed Google token to {token_path}: {e}")
+
+    try:
+        _google_service = build('calendar', 'v3', credentials=creds)
     except Exception as e:
         print(f"Error building Google Calendar service: {e}")
         return None
+    return _google_service
 
 # Athena stores event times as naive local wall-clock strings ('YYYY-MM-DD HH:MM:SS').
 # Google uses RFC3339 with an offset, so every crossing of that boundary goes through the helpers below.
@@ -1395,113 +1407,115 @@ def _google_event_span(ev):
         return f"{first_day.isoformat()} 00:00:00", f"{last_day.isoformat()} 23:59:59"
     return None
 
+def _require_service():
+    service = get_google_calendar_service()
+    if service is None:
+        raise GoogleCalendarNotConnected(GOOGLE_NOT_CONNECTED_MESSAGE)
+    return service
+
 def push_event_to_google(title, description, start_time, end_time):
     """
-    Push a new event to Google Calendar. Returns google event id if successful, else None.
+    Push a new event to Google Calendar. Returns the Google event id.
+    Raises GoogleCalendarNotConnected or GoogleCalendarAPIError on failure.
     """
-    service = get_google_calendar_service()
-    if not service:
-        return None
+    service = _require_service()
+    event_body = {
+        'summary': title,
+        'description': description or '',
+        'start': _google_time(start_time),
+        'end': _google_time(end_time)
+    }
     try:
-        event_body = {
-            'summary': title,
-            'description': description or '',
-            'start': _google_time(start_time),
-            'end': _google_time(end_time)
-        }
         created = service.events().insert(calendarId='primary', body=event_body).execute()
-        return created.get('id')
     except Exception as e:
-        print(f"Error pushing event to Google Calendar: {e}")
-        return None
+        raise GoogleCalendarAPIError(f"Could not create the event in Google Calendar: {e}") from e
+    google_id = created.get('id')
+    if not google_id:
+        raise GoogleCalendarAPIError("Google Calendar did not return an event id.")
+    return google_id
 
 def update_event_in_google(event_uid, title, description, start_time, end_time):
     """
-    Update an existing event in Google Calendar.
+    Update an existing event in Google Calendar. Returns False for local-only uids (nothing to do).
+    Raises GoogleCalendarNotConnected or GoogleCalendarAPIError on failure.
     """
     if not event_uid or '@local' in event_uid:
         return False
-    service = get_google_calendar_service()
-    if not service:
-        return False
+    service = _require_service()
+    event_body = {
+        'summary': title,
+        'description': description or '',
+        'start': _google_time(start_time),
+        'end': _google_time(end_time)
+    }
     try:
-        event_body = {
-            'summary': title,
-            'description': description or '',
-            'start': _google_time(start_time),
-            'end': _google_time(end_time)
-        }
         service.events().patch(calendarId='primary', eventId=event_uid, body=event_body).execute()
-        return True
     except Exception as e:
-        print(f"Error updating event in Google Calendar: {e}")
-        return False
+        raise GoogleCalendarAPIError(f"Could not update the event in Google Calendar: {e}") from e
+    return True
 
 def delete_event_from_google(event_uid):
     """
-    Delete an event from Google Calendar if event_uid belongs to Google.
+    Delete an event from Google Calendar. Returns False for local-only uids (nothing to do).
+    Raises GoogleCalendarNotConnected or GoogleCalendarAPIError on failure.
     """
     if not event_uid or '@local' in event_uid:
         return False
-    service = get_google_calendar_service()
-    if not service:
-        return False
+    service = _require_service()
     try:
         service.events().delete(calendarId='primary', eventId=event_uid).execute()
-        return True
     except Exception as e:
-        print(f"Error deleting event from Google Calendar: {e}")
-        return False
+        raise GoogleCalendarAPIError(f"Could not delete the event in Google Calendar: {e}") from e
+    return True
 
 def fetch_google_calendar_events(window_start, window_end):
     """
     Return all Google event items overlapping [window_start, window_end) (naive local datetimes),
     following nextPageToken. Cancelled items are included (showDeleted=True); the caller drops them.
-    Returns None on any failure, so an outage is never mistaken for an empty calendar.
+    Raises GoogleCalendarNotConnected or GoogleCalendarAPIError.
     """
-    service = get_google_calendar_service()
-    if not service:
-        return None
+    service = _require_service()
     time_min = _to_rfc3339(window_start)
     time_max = _to_rfc3339(window_end)
     items = []
     page_token = None
-    try:
-        print('Fetching events from Google Calendar...')
-        while True:
-            params = {
-                'calendarId': 'primary',
-                'timeMin': time_min,
-                'timeMax': time_max,
-                'singleEvents': True,
-                'showDeleted': True,
-                'orderBy': 'startTime',
-            }
-            if page_token:
-                params['pageToken'] = page_token
+    print('Fetching events from Google Calendar...')
+    while True:
+        params = {
+            'calendarId': 'primary',
+            'timeMin': time_min,
+            'timeMax': time_max,
+            'singleEvents': True,
+            'showDeleted': True,
+            'orderBy': 'startTime',
+        }
+        if page_token:
+            params['pageToken'] = page_token
+        try:
             result = service.events().list(**params).execute()
-            items.extend(result.get('items', []))
-            page_token = result.get('nextPageToken')
-            if not page_token:
-                return items
-    except Exception as e:
-        print(f"Error fetching Google Calendar events: {e}")
-        return None
+        except Exception as e:
+            raise GoogleCalendarAPIError(f"Could not fetch events from Google Calendar: {e}") from e
+        items.extend(result.get('items', []))
+        page_token = result.get('nextPageToken')
+        if not page_token:
+            return items
 
 def sync_google_calendar_to_db():
     """
     Pull Google Calendar events for the rolling window (-30 to +60 days) into calendar_events.
-    Conflicts are resolved last-write-wins from Google: a local edit to a synced event is overwritten on the next pull.
+
+    Conflicts are last-write-wins from Google: a local edit to a synced event is overwritten on the next pull.
     Rows with source='google' inside the window that Google no longer returns (deleted or cancelled) are removed,
-    and any tasks attached to them are detached. Skipped entirely if the fetch fails.
+    and tasks attached to them are detached.
+
+    Returns {"connected", "added", "updated", "deleted", "error"}.
+    Raises GoogleCalendarNotConnected or GoogleCalendarAPIError. Nothing is deleted when the fetch fails.
     """
     now = datetime.now()
     window_start = now - timedelta(days=30)
     window_end = now + timedelta(days=60)
 
     google_events = fetch_google_calendar_events(window_start, window_end)
-    if google_events is None:
-        return
 
     now_str = now.strftime(ATHENA_TIME_FMT)
     conn = get_db_connection()
@@ -1509,7 +1523,8 @@ def sync_google_calendar_to_db():
 
     try:
         seen_uids = set()
-        count = 0
+        added = 0
+        updated = 0
         for ev in google_events:
             if ev.get('status') == 'cancelled' or not ev.get('id'):
                 continue
@@ -1529,16 +1544,17 @@ def sync_google_calendar_to_db():
                     SET title = ?, description = ?, start_time = ?, end_time = ?, synced_at = ?
                     WHERE id = ?
                 """, (title, description, start_str, end_str, now_str, existing['id']))
+                updated += 1
             else:
                 cursor.execute("""
                     INSERT INTO calendar_events
                     (title, description, start_time, end_time, source, event_uid, tags, color, synced_at)
                     VALUES (?, ?, ?, ?, 'google', ?, '[]', '#4facfe', ?)
                 """, (title, description, start_str, end_str, ev['id'], now_str))
-            count += 1
+                added += 1
 
         # Remove Google-sourced rows inside the window that were not returned (deleted or cancelled in Google).
-        # Explicitly detach tasks first so the removal does not depend on foreign-key enforcement.
+        # Tasks are detached explicitly so this does not depend on foreign-key enforcement.
         cursor.execute(
             "SELECT id, event_uid FROM calendar_events WHERE source = 'google' AND start_time >= ? AND start_time < ?",
             (window_start.strftime(ATHENA_TIME_FMT), window_end.strftime(ATHENA_TIME_FMT))
@@ -1549,12 +1565,14 @@ def sync_google_calendar_to_db():
             cursor.execute("DELETE FROM calendar_events WHERE id = ?", (stale_id,))
 
         conn.commit()
-        print(f"Synced {count} Google Calendar events to database; removed {len(stale_ids)} stale events.")
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        print(f"Error syncing Google Calendar to database: {e}")
+        raise
     finally:
         conn.close()
+
+    print(f"Synced Google Calendar: {added} added, {updated} updated, {len(stale_ids)} removed.")
+    return {"connected": True, "added": added, "updated": updated, "deleted": len(stale_ids), "error": None}
 
 def archive_and_reset_tasks_nightly(target_date=None):
     """
@@ -2287,7 +2305,10 @@ def run_agent_sync():
 
     # 4. Sync Google Calendar
     print("\nSyncing Google Calendar...")
-    sync_google_calendar_to_db()
+    try:
+        sync_google_calendar_to_db()
+    except GoogleCalendarError as e:
+        print(f"Google Calendar sync skipped: {e}")
 
     # 5. Write back active tasks to tasks.md
     print("\nWriting back active tasks to tasks.md...")

@@ -2039,17 +2039,22 @@ def delete_calendar_event(event_id: int):
 @app.post("/api/calendar/sync-google")
 def trigger_google_calendar_sync():
     """
-    Bidirectional trigger: pulls latest Google Calendar events into Athena and updates timestamp.
+    Bidirectional trigger: pulls latest Google Calendar events into Athena and returns the counts.
     """
     try:
-        agent.sync_google_calendar_to_db()
-        return {
-            "status": "success", 
-            "message": "Google Calendar sync completed", 
-            "synced_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        result = agent.sync_google_calendar_to_db()
+    except agent.GoogleCalendarNotConnected as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except agent.GoogleCalendarAPIError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Google Calendar sync failed: {str(e)}")
+    return {
+        "status": "success",
+        "message": "Google Calendar sync completed",
+        "synced_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        **result,
+    }
 
 @app.get("/api/calendar/gaps")
 def get_calendar_gaps(date: str, day_start: str = "08:00", day_end: str = "22:00"):
