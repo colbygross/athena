@@ -1500,6 +1500,41 @@ def fetch_google_calendar_events(window_start, window_end):
         if not page_token:
             return items
 
+def push_pending_events():
+    """
+    Push local events whose create failed earlier (google_pending = 1) and convert each to source='google'.
+    Failures stay pending for the next sync. Returns the Google ids of events that were pushed.
+    Raises GoogleCalendarNotConnected if Google is not connected.
+    """
+    _require_service()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    pushed_uids = []
+    try:
+        cursor.execute(
+            "SELECT id, title, description, start_time, end_time FROM calendar_events "
+            "WHERE google_pending = 1 AND source = 'local_ics'"
+        )
+        for row in cursor.fetchall():
+            try:
+                google_id = push_event_to_google(row['title'], row['description'], row['start_time'], row['end_time'])
+            except GoogleCalendarAPIError as e:
+                print(f"Pending event {row['id']} still not in Google Calendar: {e}")
+                continue
+            cursor.execute(
+                "UPDATE calendar_events SET source = 'google', event_uid = ?, google_pending = 0, synced_at = ? WHERE id = ?",
+                (google_id, datetime.now().strftime(ATHENA_TIME_FMT), row['id'])
+            )
+            # Commit per event so a later failure cannot leave it pending and push it again.
+            conn.commit()
+            pushed_uids.append(google_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return pushed_uids
+
 def sync_google_calendar_to_db():
     """
     Pull Google Calendar events for the rolling window (-30 to +60 days) into calendar_events.
@@ -1508,21 +1543,23 @@ def sync_google_calendar_to_db():
     Rows with source='google' inside the window that Google no longer returns (deleted or cancelled) are removed,
     and tasks attached to them are detached.
 
-    Returns {"connected", "added", "updated", "deleted", "error"}.
+    Pending local events are pushed first. Returns {"connected", "pushed", "added", "updated", "deleted", "error"}.
     Raises GoogleCalendarNotConnected or GoogleCalendarAPIError. Nothing is deleted when the fetch fails.
     """
     now = datetime.now()
     window_start = now - timedelta(days=30)
     window_end = now + timedelta(days=60)
 
+    pushed_uids = push_pending_events()
     google_events = fetch_google_calendar_events(window_start, window_end)
 
     now_str = now.strftime(ATHENA_TIME_FMT)
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Events pushed just now count as seen, so a fetch that lags behind them cannot delete them below.
+    seen_uids = set(pushed_uids)
     try:
-        seen_uids = set()
         added = 0
         updated = 0
         for ev in google_events:
@@ -1572,7 +1609,14 @@ def sync_google_calendar_to_db():
         conn.close()
 
     print(f"Synced Google Calendar: {added} added, {updated} updated, {len(stale_ids)} removed.")
-    return {"connected": True, "added": added, "updated": updated, "deleted": len(stale_ids), "error": None}
+    return {
+        "connected": True,
+        "pushed": len(pushed_uids),
+        "added": added,
+        "updated": updated,
+        "deleted": len(stale_ids),
+        "error": None,
+    }
 
 def archive_and_reset_tasks_nightly(target_date=None):
     """

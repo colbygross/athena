@@ -3,6 +3,7 @@ Google Calendar sync tests. The Google API is always a MagicMock; nothing here c
 """
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -316,7 +317,7 @@ def test_sync_returns_counts(tmp_db, ny_zone, svc):
 
     result = agent.sync_google_calendar_to_db()
 
-    assert result == {"connected": True, "added": 1, "updated": 1, "deleted": 0, "error": None}
+    assert result == {"connected": True, "pushed": 0, "added": 1, "updated": 1, "deleted": 0, "error": None}
 
 
 @pytest.fixture
@@ -350,3 +351,126 @@ def test_sync_endpoint_returns_counts_on_success(api_client, ny_zone, svc):
     assert res.status_code == 200
     assert body["status"] == "success"
     assert (body["added"], body["updated"], body["deleted"]) == (1, 0, 0)
+
+
+# --- Item 8: failed pushes retried; update failures propagated ---
+
+@pytest.fixture
+def no_ics(monkeypatch):
+    monkeypatch.setattr(agent, "serialize_local_events_to_ics_helper", lambda: None)
+
+
+def _future_day(days=3):
+    return (datetime.now() + timedelta(days=days)).date().isoformat()
+
+
+def test_failed_create_is_saved_pending_and_pushed_on_next_sync(tmp_db, ny_zone, svc, no_ics, api_client):
+    day = _future_day()
+    svc.events.return_value.insert.return_value.execute.side_effect = RuntimeError("network down")
+
+    res = api_client.post("/api/calendar", json={
+        "title": "Retry me", "start_time": f"{day} 09:00", "end_time": f"{day} 10:00",
+    })
+    assert res.status_code == 200
+    assert res.json()["source"] == "local_ics"
+    assert res.json()["google_pending"] is True
+    row = _rows("SELECT source, google_pending, start_time FROM calendar_events WHERE title = 'Retry me'")[0]
+    assert (row["source"], row["google_pending"]) == ("local_ics", 1)
+    assert row["start_time"] == f"{day} 09:00:00"
+
+    # Still failing: the event stays pending.
+    svc.events.return_value.list.return_value.execute.return_value = {"items": []}
+    agent.sync_google_calendar_to_db()
+    row = _rows("SELECT source, google_pending FROM calendar_events WHERE title = 'Retry me'")[0]
+    assert (row["source"], row["google_pending"]) == ("local_ics", 1)
+
+    # Google is back: the next sync pushes it with the local offset, converts the row, and keeps it.
+    svc.events.return_value.insert.return_value.execute.side_effect = None
+    svc.events.return_value.insert.return_value.execute.return_value = {"id": "gid-retry"}
+    svc.events.return_value.insert.reset_mock()
+    result = agent.sync_google_calendar_to_db()
+
+    body = svc.events.return_value.insert.call_args.kwargs["body"]
+    local_9am = datetime.fromisoformat(f"{day}T09:00:00").replace(tzinfo=ZoneInfo("America/New_York"))
+    assert body["start"]["dateTime"] == local_9am.isoformat()
+    assert body["start"]["timeZone"] == "America/New_York"
+    assert result["pushed"] == 1
+    row = _rows("SELECT source, event_uid, google_pending FROM calendar_events WHERE title = 'Retry me'")[0]
+    assert (row["source"], row["event_uid"], row["google_pending"]) == ("google", "gid-retry", 0)
+
+
+def test_pushed_pending_event_survives_a_fetch_that_has_not_caught_up(tmp_db, ny_zone, svc, no_ics):
+    day = _future_day()
+    conn = database.create_new_connection()
+    conn.execute(
+        "INSERT INTO calendar_events (title, description, start_time, end_time, source, event_uid, tags, color, google_pending) "
+        "VALUES ('Lagging', '', ?, ?, 'local_ics', 'uuid-lag@local', '[]', '#4facfe', 1)",
+        (f"{day} 09:00:00", f"{day} 10:00:00"),
+    )
+    conn.commit()
+    conn.close()
+    svc.events.return_value.insert.return_value.execute.return_value = {"id": "gid-lag"}
+    # Google's list does not include the event yet.
+    svc.events.return_value.list.return_value.execute.return_value = {"items": []}
+
+    agent.sync_google_calendar_to_db()
+
+    uids = {r["event_uid"] for r in _rows("SELECT event_uid FROM calendar_events WHERE title = 'Lagging'")}
+    assert uids == {"gid-lag"}
+
+
+def test_pending_push_failure_during_sync_keeps_event_pending(tmp_db, ny_zone, svc, no_ics):
+    day = _future_day()
+    conn = database.create_new_connection()
+    conn.execute(
+        "INSERT INTO calendar_events (title, description, start_time, end_time, source, event_uid, tags, color, google_pending) "
+        "VALUES ('Still pending', '', ?, ?, 'local_ics', 'uuid-sp@local', '[]', '#4facfe', 1)",
+        (f"{day} 09:00:00", f"{day} 10:00:00"),
+    )
+    conn.commit()
+    conn.close()
+    svc.events.return_value.insert.return_value.execute.side_effect = RuntimeError("500")
+    svc.events.return_value.list.return_value.execute.return_value = {"items": []}
+
+    result = agent.sync_google_calendar_to_db()
+
+    row = _rows("SELECT source, google_pending FROM calendar_events WHERE title = 'Still pending'")[0]
+    assert (row["source"], row["google_pending"]) == ("local_ics", 1)
+    assert result["pushed"] == 0
+
+
+def test_update_failure_returns_502_and_keeps_local_row_unchanged(tmp_db, ny_zone, svc, api_client):
+    _insert_event("g-upd", "2026-10-15 09:00:00", "2026-10-15 10:00:00", title="Original")
+    event_id = _rows("SELECT id FROM calendar_events WHERE event_uid = 'g-upd'")[0]["id"]
+    svc.events.return_value.patch.return_value.execute.side_effect = RuntimeError("412 precondition")
+
+    res = api_client.put(f"/api/calendar/{event_id}", json={"title": "Renamed"})
+
+    assert res.status_code == 502
+    assert "412 precondition" in res.json()["detail"]
+    row = _rows("SELECT title FROM calendar_events WHERE id = ?", (event_id,))[0]
+    assert row["title"] == "Original"
+
+
+def test_update_pushes_local_offset_times_to_google(tmp_db, ny_zone, svc, api_client):
+    _insert_event("g-time", "2026-10-15 09:00:00", "2026-10-15 10:00:00")
+    event_id = _rows("SELECT id FROM calendar_events WHERE event_uid = 'g-time'")[0]["id"]
+
+    res = api_client.put(f"/api/calendar/{event_id}", json={"start_time": "2026-10-15 13:00", "end_time": "2026-10-15 14:00"})
+
+    assert res.status_code == 200
+    body = svc.events.return_value.patch.call_args.kwargs["body"]
+    assert body["start"]["dateTime"] == "2026-10-15T13:00:00-04:00"
+    row = _rows("SELECT start_time FROM calendar_events WHERE id = ?", (event_id,))[0]
+    assert row["start_time"] == "2026-10-15 13:00:00"
+
+
+def test_update_of_google_event_while_disconnected_is_refused(tmp_db, ny_zone, monkeypatch, api_client):
+    _insert_event("g-off", "2026-10-15 09:00:00", "2026-10-15 10:00:00", title="Offline")
+    event_id = _rows("SELECT id FROM calendar_events WHERE event_uid = 'g-off'")[0]["id"]
+    monkeypatch.setattr(agent, "get_google_calendar_service", lambda: None)
+
+    res = api_client.put(f"/api/calendar/{event_id}", json={"title": "Renamed"})
+
+    assert res.status_code == 400
+    assert _rows("SELECT title FROM calendar_events WHERE id = ?", (event_id,))[0]["title"] == "Offline"

@@ -311,6 +311,7 @@ def init_db():
         tags TEXT DEFAULT '[]', -- JSON array of tag strings e.g. ["#Work", "#Meeting"]
         color TEXT DEFAULT '#4facfe',
         synced_at DATETIME,
+        google_pending INTEGER DEFAULT 0, -- 1 = created locally, not yet pushed to Google
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     """)
@@ -478,6 +479,9 @@ def init_db():
     if 'synced_at' not in cal_columns:
         print("Migrating: Adding synced_at column to calendar_events table...")
         cursor.execute("ALTER TABLE calendar_events ADD COLUMN synced_at DATETIME;")
+    if 'google_pending' not in cal_columns:
+        print("Migrating: Adding google_pending column to calendar_events table...")
+        cursor.execute("ALTER TABLE calendar_events ADD COLUMN google_pending INTEGER DEFAULT 0;")
     
     # MIGRATION: Add career columns to job_applications if they don't exist
     cursor.execute("PRAGMA table_info(job_applications);")

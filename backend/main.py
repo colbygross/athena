@@ -1906,8 +1906,16 @@ def get_calendar():
     finally:
         conn.close()
 
+def _normalize_event_time(value, field):
+    try:
+        return agent.normalize_athena_time(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{field} must be a local time like 'YYYY-MM-DD HH:MM'")
+
 @app.post("/api/calendar")
 def add_calendar_event(event: CalendarEventCreate):
+    start_str = _normalize_event_time(event.start_time, "start_time")
+    end_str = _normalize_event_time(event.end_time, "end_time")
     conn = get_db_connection()
     cursor = conn.cursor()
     tags_json = json.dumps(event.tags or [])
@@ -1917,23 +1925,24 @@ def add_calendar_event(event: CalendarEventCreate):
     event_uid = f"{uuid.uuid4()}@local"
     source = "local_ics"
     synced_at = None
+    google_pending = 0
 
     if event.sync_to_google:
         try:
-            google_uid = agent.push_event_to_google(event.title, event.description, event.start_time, event.end_time)
-            if google_uid:
-                event_uid = google_uid
-                source = "google"
-                synced_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        except Exception as e:
-            print(f"Failed to push to Google Calendar, saving locally: {e}")
+            event_uid = agent.push_event_to_google(event.title, event.description, start_str, end_str)
+            source = "google"
+            synced_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except agent.GoogleCalendarError as e:
+            # Keep it locally and mark it pending; the next Google sync pushes it.
+            print(f"Google push failed, saving locally as pending: {e}")
+            google_pending = 1
 
     try:
         cursor.execute(
             """INSERT INTO calendar_events 
-               (title, description, start_time, end_time, source, event_uid, tags, color, synced_at) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (event.title, event.description, event.start_time, event.end_time, source, event_uid, tags_json, color, synced_at)
+               (title, description, start_time, end_time, source, event_uid, tags, color, synced_at, google_pending) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (event.title, event.description, start_str, end_str, source, event_uid, tags_json, color, synced_at, google_pending)
         )
         conn.commit()
         event_id = cursor.lastrowid
@@ -1948,7 +1957,7 @@ def add_calendar_event(event: CalendarEventCreate):
     except Exception as e:
         print(f"Error serializing local events: {e}")
         
-    return {"status": "success", "id": event_id, "event_uid": event_uid, "source": source}
+    return {"status": "success", "id": event_id, "event_uid": event_uid, "source": source, "google_pending": bool(google_pending)}
 
 @app.put("/api/calendar/{event_id}")
 def update_calendar_event(event_id: int, event_data: CalendarEventUpdate):
@@ -1960,44 +1969,44 @@ def update_calendar_event(event_id: int, event_data: CalendarEventUpdate):
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
-        updates = []
-        params = []
+        # Only the fields the caller sent (column name -> new value).
+        changes = {}
         if event_data.title is not None:
-            updates.append("title = ?")
-            params.append(event_data.title)
+            changes["title"] = event_data.title
         if event_data.description is not None:
-            updates.append("description = ?")
-            params.append(event_data.description)
+            changes["description"] = event_data.description
         if event_data.start_time is not None:
-            updates.append("start_time = ?")
-            params.append(event_data.start_time)
+            changes["start_time"] = _normalize_event_time(event_data.start_time, "start_time")
         if event_data.end_time is not None:
-            updates.append("end_time = ?")
-            params.append(event_data.end_time)
+            changes["end_time"] = _normalize_event_time(event_data.end_time, "end_time")
         if event_data.tags is not None:
-            updates.append("tags = ?")
-            params.append(json.dumps(event_data.tags))
+            changes["tags"] = json.dumps(event_data.tags)
         if event_data.color is not None:
-            updates.append("color = ?")
-            params.append(event_data.color)
+            changes["color"] = event_data.color
 
-        if updates:
-            params.append(event_id)
-            cursor.execute(f"UPDATE calendar_events SET {', '.join(updates)} WHERE id = ?", tuple(params))
-            conn.commit()
-
-        # Update in Google Calendar if synced
+        # Push to Google first. If Google rejects the change, nothing is saved locally, so the two stay in step.
         if event['source'] == 'google' and event['event_uid'] and '@local' not in event['event_uid']:
-            new_title = event_data.title or event['title']
-            new_desc = event_data.description if event_data.description is not None else event['description']
-            new_start = event_data.start_time or event['start_time']
-            new_end = event_data.end_time or event['end_time']
             try:
-                agent.update_event_in_google(event['event_uid'], new_title, new_desc, new_start, new_end)
-            except Exception as e:
-                print(f"Error updating Google Calendar event: {e}")
+                agent.update_event_in_google(
+                    event['event_uid'],
+                    changes.get("title", event['title']),
+                    changes.get("description", event['description']),
+                    changes.get("start_time", event['start_time']),
+                    changes.get("end_time", event['end_time']),
+                )
+            except agent.GoogleCalendarNotConnected as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except agent.GoogleCalendarError as e:
+                raise HTTPException(status_code=502, detail=f"Change not saved: {e}")
 
+        if changes:
+            columns = ", ".join(f"{column} = ?" for column in changes)
+            cursor.execute(f"UPDATE calendar_events SET {columns} WHERE id = ?", (*changes.values(), event_id))
+        conn.commit()
         return {"status": "success", "id": event_id}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
