@@ -7,6 +7,9 @@ function OverviewTab({ overviewData, setActiveTab, fileUrl, handleFormSubmit }) 
   return (
     <div>
       <header className="page-header">
+        <time className="page-date" dateTime={new Date().toISOString().slice(0, 10)}>
+          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+        </time>
         <h1 className="page-title text-gradient-cyan glitch-text">Overview</h1>
         <p className="page-subtitle">Athena Diagnostics: Link Established</p>
       </header>
