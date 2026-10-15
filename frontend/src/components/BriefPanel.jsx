@@ -257,28 +257,28 @@ function LinearMarkdownRenderer({ content }) {
     if (trimmed.startsWith('# ')) {
       flushList(idx);
       renderedElements.push(
-        <h2 key={idx} className="brief-h1" style={{ borderBottom: '1px dashed var(--accent-cyan)', paddingBottom: '0.5rem', marginBottom: '1rem', marginTop: '1.5rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-display)' }}>
+        <h2 key={idx} className="brief-h1" style={{ borderBottom: '1px dashed var(--accent-cyan)', paddingBottom: '0.5rem', marginBottom: '1rem', marginTop: '1.5rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-text)' }}>
           {trimmed.substring(2)}
         </h2>
       );
     } else if (trimmed.startsWith('## ')) {
       flushList(idx);
       renderedElements.push(
-        <h3 key={idx} className="brief-h2" style={{ color: 'var(--accent-green)', marginTop: '1.5rem', marginBottom: '0.75rem', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem', fontFamily: 'var(--font-display)' }}>
+        <h3 key={idx} className="brief-h2" style={{ color: 'var(--accent-green)', marginTop: '1.5rem', marginBottom: '0.75rem', fontSize: 'var(--text-md)', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem', fontFamily: 'var(--font-text)' }}>
           {trimmed.substring(3)}
         </h3>
       );
     } else if (trimmed.startsWith('### ')) {
       flushList(idx);
       renderedElements.push(
-        <h4 key={idx} className="brief-h3" style={{ color: 'var(--text-primary)', marginTop: '1rem', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
+        <h4 key={idx} className="brief-h3" style={{ color: 'var(--text-primary)', marginTop: '1rem', marginBottom: '0.5rem', fontSize: 'var(--text-sm)' }}>
           {trimmed.substring(4)}
         </h4>
       );
     } else if (trimmed.startsWith('> ')) {
       flushList(idx);
       renderedElements.push(
-        <blockquote key={idx} className="brief-blockquote" style={{ borderLeft: '3px solid var(--accent-purple)', paddingLeft: '1rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '1rem 0' }}>
+        <blockquote key={idx} className="brief-blockquote" style={{ paddingLeft: '1rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '1rem 0' }}>
           {trimmed.substring(2)}
         </blockquote>
       );
@@ -289,8 +289,8 @@ function LinearMarkdownRenderer({ content }) {
         const checked = listContent.startsWith('[x]') || listContent.startsWith('[X]');
         const text = listContent.substring(3).trim();
         listItems.push(
-          <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: checked ? 'var(--accent-pink)' : 'var(--text-muted)', userSelect: 'none' }} aria-hidden="true">
+          <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', fontSize: 'var(--text-sm)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)', color: checked ? 'var(--accent-pink)' : 'var(--text-muted)', userSelect: 'none' }} aria-hidden="true">
               {checked ? 'check_box' : 'check_box_outline_blank'}
             </span>
             <span style={{ textDecoration: checked ? 'line-through' : 'none', color: checked ? 'var(--text-muted)' : 'var(--text-primary)' }}>
@@ -300,7 +300,7 @@ function LinearMarkdownRenderer({ content }) {
         );
       } else {
         listItems.push(
-          <li key={idx} style={{ marginBottom: '0.4rem', fontSize: '0.85rem', color: 'var(--text-primary)', position: 'relative', paddingLeft: '1rem' }}>
+          <li key={idx} style={{ marginBottom: '0.4rem', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', position: 'relative', paddingLeft: '1rem' }}>
             <span style={{ position: 'absolute', left: 0, color: 'var(--accent-cyan)' }}>•</span>
             {listContent}
           </li>
@@ -318,7 +318,7 @@ function LinearMarkdownRenderer({ content }) {
         return part;
       });
       renderedElements.push(
-        <p key={idx} className="brief-p" style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+        <p key={idx} className="brief-p" style={{ marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
           {children}
         </p>
       );
@@ -345,32 +345,32 @@ function RenderBrief({ content }) {
   const comingUpCount = parsed.comingUp.length;
 
   return (
-    <div className="brief-dashboard-container flicker-effect">
+    <div className="brief-dashboard-container">
       {/* Dashboard Header Banner */}
       <div className="brief-dashboard-header">
         <div className="brief-dashboard-header-inner">
           <div className="brief-header-meta">
-            <h2 className="brief-header-title">[ ATHENA_DAILY_LOG: {parsed.date || 'LOG_SHEET'} ]</h2>
+            <h2 className="brief-header-title">Daily log: {parsed.date || 'undated'}</h2>
             <span className="brief-header-timestamp">
-              <span className="material-symbols-outlined" style={{ fontSize: '0.8rem', verticalAlign: 'middle', marginRight: '0.25rem' }} aria-hidden="true">schedule</span>
-              TELEMETRY GENERATED AT: {parsed.generatedAt || '00:00:00'}
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-xs)', verticalAlign: 'middle', marginRight: '0.25rem' }} aria-hidden="true">schedule</span>
+              Generated at {parsed.generatedAt || '00:00:00'}
             </span>
           </div>
           <div className="brief-header-stats">
             <div className="brief-stat-badge cyan">
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }} aria-hidden="true">calendar_today</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)' }} aria-hidden="true">calendar_today</span>
               <span>{totalEvents} Events</span>
             </div>
             <div className="brief-stat-badge green">
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }} aria-hidden="true">task_alt</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)' }} aria-hidden="true">task_alt</span>
               <span>{completedCount} Done</span>
             </div>
             <div className="brief-stat-badge pink">
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }} aria-hidden="true">warning</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)' }} aria-hidden="true">warning</span>
               <span>{overdueCount} Overdue</span>
             </div>
             <div className="brief-stat-badge purple">
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }} aria-hidden="true">sync</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)' }} aria-hidden="true">sync</span>
               <span>{habitsDone}/{habitsTotal} Habits</span>
             </div>
           </div>
@@ -393,7 +393,7 @@ function RenderBrief({ content }) {
             <div className="brief-card-content">
               {totalEvents === 0 ? (
                 <div className="brief-empty-notice">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }} aria-hidden="true">calendar_today</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }} aria-hidden="true">calendar_today</span>
                   <span>No events scheduled for today. Vault is clear.</span>
                 </div>
               ) : (
@@ -427,7 +427,7 @@ function RenderBrief({ content }) {
                parsed.yesterday.fitness.length === 0 && 
                !parsed.yesterday.health ? (
                 <div className="brief-empty-notice">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }} aria-hidden="true">history</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }} aria-hidden="true">history</span>
                   <span>No tracked activity recorded yesterday.</span>
                 </div>
               ) : (
@@ -438,7 +438,7 @@ function RenderBrief({ content }) {
                       <ul className="brief-yesterday-list">
                         {parsed.yesterday.completed.map((t, idx) => (
                           <li key={idx} className="brief-yesterday-list-item">
-                            <span className="material-symbols-outlined" style={{ fontSize: '0.95rem', color: 'var(--accent-green)' }} aria-hidden="true">check</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-green)' }} aria-hidden="true">check</span>
                             <span>{t.title}</span>
                             <span className="brief-task-cat-badge">{t.category}</span>
                           </li>
@@ -453,7 +453,7 @@ function RenderBrief({ content }) {
                       <ul className="brief-yesterday-list">
                         {parsed.yesterday.fitness.map((fit, idx) => (
                           <li key={idx} className="brief-yesterday-list-item">
-                            <span className="material-symbols-outlined" style={{ fontSize: '0.95rem', color: 'var(--accent-pink)' }} aria-hidden="true">directions_run</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-pink)' }} aria-hidden="true">directions_run</span>
                             <span>{fit}</span>
                           </li>
                         ))}
@@ -465,7 +465,7 @@ function RenderBrief({ content }) {
                     <div className="brief-yesterday-section">
                       <div className="brief-yesterday-title">Biometrics & Vitals</div>
                       <div className="brief-yesterday-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--accent-cyan)' }} aria-hidden="true">monitor_heart</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)', color: 'var(--accent-cyan)' }} aria-hidden="true">monitor_heart</span>
                         <span>{parsed.yesterday.health}</span>
                       </div>
                     </div>
@@ -502,20 +502,20 @@ function RenderBrief({ content }) {
 
               {parsed.habits.list.length === 0 ? (
                 <div className="brief-empty-notice">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">sync_disabled</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)' }} aria-hidden="true">sync_disabled</span>
                   <span>No habits queued for tracking today.</span>
                 </div>
               ) : (
                 <div className="brief-habit-list">
                   {parsed.habits.list.map((habit, idx) => (
                     <div key={idx} className={`brief-habit-item ${habit.completed ? 'completed' : ''} ${habit.notLogged ? 'not-logged' : ''}`}>
-                      <span className="material-symbols-outlined habit-icon" style={{ fontSize: '1rem', userSelect: 'none' }} aria-hidden="true">
+                      <span className="material-symbols-outlined habit-icon" style={{ fontSize: 'var(--text-md)', userSelect: 'none' }} aria-hidden="true">
                         {habit.completed ? 'check_box' : habit.notLogged ? 'radio_button_unchecked' : 'check_box_outline_blank'}
                       </span>
                       <span style={{ textDecoration: habit.completed ? 'line-through' : 'none' }}>
                         {habit.name}
                       </span>
-                      {habit.notLogged && <span style={{ fontSize: '0.75rem', marginLeft: 'auto', opacity: 0.6 }}>(not logged)</span>}
+                      {habit.notLogged && <span style={{ fontSize: 'var(--text-xs)', marginLeft: 'auto', opacity: 0.6 }}>(not logged)</span>}
                     </div>
                   ))}
                 </div>
@@ -537,7 +537,7 @@ function RenderBrief({ content }) {
                 <div className="brief-habit-list">
                   {parsed.workout.exercises.map((ex, idx) => (
                     <div key={idx} className={`brief-habit-item ${ex.completed ? 'completed' : ''}`}>
-                      <span className="material-symbols-outlined habit-icon" style={{ fontSize: '1rem', color: ex.completed ? 'var(--accent-green)' : 'var(--text-muted)' }} aria-hidden="true">
+                      <span className="material-symbols-outlined habit-icon" style={{ fontSize: 'var(--text-md)', color: ex.completed ? 'var(--accent-green)' : 'var(--text-muted)' }} aria-hidden="true">
                         {ex.completed ? 'check_box' : 'check_box_outline_blank'}
                       </span>
                       <span style={{ textDecoration: ex.completed ? 'line-through' : 'none' }}>
@@ -561,7 +561,7 @@ function RenderBrief({ content }) {
             <div className="brief-card-content">
               {stillDueCount === 0 && overdueCount === 0 && completedCount === 0 && comingUpCount === 0 ? (
                 <div className="brief-empty-notice">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }} aria-hidden="true">assignment_turned_in</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)' }} aria-hidden="true">assignment_turned_in</span>
                   <span>No tasks listed in the briefing sheets.</span>
                 </div>
               ) : (
@@ -574,7 +574,7 @@ function RenderBrief({ content }) {
                         {parsed.overdueTasks.map((t, idx) => (
                           <div key={idx} className="brief-task-card">
                             <div className="brief-task-info">
-                              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--accent-pink)' }} aria-hidden="true">warning</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-pink)' }} aria-hidden="true">warning</span>
                               <span className="brief-task-title">{t.title}</span>
                               <span className="brief-task-cat-badge">{t.category}</span>
                             </div>
@@ -595,7 +595,7 @@ function RenderBrief({ content }) {
                         {parsed.stillDueToday.map((t, idx) => (
                           <div key={idx} className="brief-task-card">
                             <div className="brief-task-info">
-                              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--accent-cyan)' }} aria-hidden="true">radio_button_unchecked</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-cyan)' }} aria-hidden="true">radio_button_unchecked</span>
                               <span className="brief-task-title">{t.title}</span>
                               <span className="brief-task-cat-badge">{t.category}</span>
                             </div>
@@ -613,7 +613,7 @@ function RenderBrief({ content }) {
                         {parsed.completedToday.map((t, idx) => (
                           <div key={idx} className="brief-task-card completed">
                             <div className="brief-task-info">
-                              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--accent-green)' }} aria-hidden="true">check_circle</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-green)' }} aria-hidden="true">check_circle</span>
                               <span className="brief-task-title">{t.title}</span>
                               <span className="brief-task-cat-badge">{t.category}</span>
                             </div>
@@ -632,7 +632,7 @@ function RenderBrief({ content }) {
                         {parsed.comingUp.map((t, idx) => (
                           <div key={idx} className="brief-task-card">
                             <div className="brief-task-info">
-                              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--accent-purple)' }} aria-hidden="true">calendar_today</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }} aria-hidden="true">calendar_today</span>
                               <span className="brief-task-title">{t.title}</span>
                               <span className="brief-task-cat-badge">{t.category}</span>
                             </div>
@@ -654,8 +654,8 @@ function RenderBrief({ content }) {
       {/* Raw Markdown Fallback Dropdown */}
       <details className="brief-fallback-details">
         <summary className="brief-fallback-summary">
-          <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', verticalAlign: 'middle', marginRight: '0.35rem' }} aria-hidden="true">terminal</span>
-          DIAGNOSTIC DATA: VIEW RAW BRIEF LOG
+          <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-sm)', verticalAlign: 'middle', marginRight: '0.35rem' }} aria-hidden="true">terminal</span>
+          View raw brief
         </summary>
         <div className="brief-fallback-content">
           <LinearMarkdownRenderer content={content} />
@@ -671,7 +671,7 @@ function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingB
       <header className="page-header" style={{ marginBottom: '1.5rem' }}>
         <div className="page-header-inner">
           <div>
-            <h1 className="page-title text-gradient-cyan glitch-text">Daily Brief</h1>
+            <h1 className="page-title">Daily brief</h1>
             <p className="page-subtitle">Intelligence Log: Diurnal Recaps</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -681,9 +681,8 @@ function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingB
                 value={selectedBrief?.date || ''}
                 onChange={(e) => onSelectBrief && onSelectBrief(e.target.value)}
                 style={{
-                  fontSize: '0.8rem',
+                  fontSize: 'var(--text-xs)',
                   padding: '0.45rem 0.85rem',
-                  fontFamily: 'var(--font-mono)',
                   background: 'var(--bg-surface)',
                   color: 'var(--text-primary)',
                   border: '1px solid var(--border-cyan)',
@@ -702,9 +701,9 @@ function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingB
               className="btn-primary" 
               onClick={handleGenerateBrief} 
               disabled={generatingBrief}
-              style={{ fontSize: '0.8rem', padding: '0.5rem 1.25rem', height: 'fit-content' }}
+              style={{ fontSize: 'var(--text-xs)', padding: '0.5rem 1.25rem', height: 'fit-content' }}
             >
-              {generatingBrief ? '⚡ Generating...' : '⚡ Generate Brief'}
+              {generatingBrief ? 'Generating…' : 'Generate brief'}
             </button>
           </div>
         </div>
@@ -715,8 +714,8 @@ function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingB
       ) : (
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6rem 2rem', color: 'var(--text-muted)' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '64px', marginBottom: '1.5rem', color: 'var(--accent-pink)' }} aria-hidden="true">terminal</span>
-          <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontFamily: 'var(--font-display)' }}>No Daily Brief Telemetry</h3>
-          <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', textAlign: 'center', maxWidth: '400px', color: 'var(--text-secondary)' }}>
+          <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontFamily: 'var(--font-text)' }}>No daily brief yet</h3>
+          <p style={{ marginBottom: '1.5rem', fontSize: 'var(--text-sm)', textAlign: 'center', maxWidth: '400px', color: 'var(--text-secondary)' }}>
             The morning brief log sheet has not been compiled yet. Trigger a sync check to generate the daily briefing metrics.
           </p>
           <button 
@@ -724,7 +723,7 @@ function BriefPanel({ selectedBrief, briefsList = [], onSelectBrief, generatingB
             onClick={handleGenerateBrief} 
             disabled={generatingBrief}
           >
-            {generatingBrief ? '⚡ Generating...' : '⚡ Generate Brief'}
+            {generatingBrief ? 'Generating…' : 'Generate brief'}
           </button>
         </div>
       )}

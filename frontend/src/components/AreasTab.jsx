@@ -17,7 +17,7 @@ function AreasTab({
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title text-gradient-purple glitch-text">Areas Explorer</h1>
+        <h1 className="page-title">Areas</h1>
         <p className="page-subtitle">Obsidian Vault: Life Domains</p>
       </header>
 
@@ -34,7 +34,7 @@ function AreasTab({
                 type="text" 
                 placeholder="Search documents..." 
                 className="form-input" 
-                style={{ fontSize: '0.85rem' }} 
+                style={{ fontSize: 'var(--text-sm)' }} 
                 onChange={(e) => {
                   const term = e.target.value.toLowerCase();
                   document.querySelectorAll('.area-list-item').forEach(item => {
@@ -50,7 +50,7 @@ function AreasTab({
             </div>
 
             {areasList.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No area documents archived in vault.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No area documents archived in vault.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.2rem' }}>
                 {["Career", "Finances", "Fitness", "Habits", "Health", "Learning"].map(cat => {
@@ -59,14 +59,13 @@ function AreasTab({
                   return (
                     <div key={cat} className="area-category-group" style={{ marginBottom: '1rem' }}>
                       <div style={{ 
-                        fontSize: '0.75rem', 
+                        fontSize: 'var(--text-xs)', 
                         fontWeight: 'bold', 
                         color: 'var(--accent-cyan)', 
                         textTransform: 'uppercase', 
                         letterSpacing: '1px', 
                         marginBottom: '0.5rem',
                         paddingLeft: '0.5rem',
-                        borderLeft: '2px solid var(--accent-cyan)'
                       }}>
                         {cat}
                       </div>
@@ -85,17 +84,16 @@ function AreasTab({
                               }}
                               style={{ 
                                 cursor: 'pointer', 
-                                border: isSel ? '1px solid var(--accent-purple)' : '1px solid transparent',
-                                background: isSel ? 'rgba(188, 19, 254, 0.05)' : '',
-                                boxShadow: isSel ? '0 0 10px rgba(188, 19, 254, 0.15)' : 'none',
+                                border: isSel ? '1px solid var(--text-secondary)' : '1px solid transparent',
+                                background: isSel ? 'var(--surface-2)' : '',
                                 padding: '0.6rem 0.8rem'
                               }}
                             >
                               <div className="item-meta">
-                                <span className="item-title" style={{ fontSize: '0.8rem', color: isSel ? 'var(--accent-purple)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
-                                  📄 {area.title}
+                                <span className="item-title" style={{ fontSize: 'var(--text-xs)', color: isSel ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
+                                  {area.title}
                                 </span>
-                                <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>{area.filename}</span>
+                                <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>{area.filename}</span>
                               </div>
                             </div>
                           );
@@ -115,23 +113,23 @@ function AreasTab({
             <>
               <div className="panel-header" style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
-                  <h3 className="panel-title" style={{ color: 'var(--accent-purple)' }}>{selectedArea.filename.replace('.md', '').replace(/_/g, ' ')}</h3>
-                  <span className="project-location-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location: 02_Areas/{selectedArea.category}/{selectedArea.filename}</span>
+                  <h3 className="panel-title" style={{ color: 'var(--text-secondary)' }}>{selectedArea.filename.replace('.md', '').replace(/_/g, ' ')}</h3>
+                  <span className="project-location-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Location: 02_Areas/{selectedArea.category}/{selectedArea.filename}</span>
                 </div>
                 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {!isEditingArea ? (
                     <button 
                       className="btn-primary" 
-                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', height: 'auto', border: '1px solid var(--accent-purple)', background: 'transparent' }}
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto', border: '1px solid var(--text-secondary)', background: 'transparent' }}
                       onClick={() => setIsEditingArea(true)}
                     >
-                      📝 Edit Markdown
+                      Edit markdown
                     </button>
                   ) : (
                     <button 
                       className="btn-secondary" 
-                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', height: 'auto' }}
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto' }}
                       onClick={() => {
                         setIsEditingArea(false);
                         fetchAreaContent(selectedArea.category, selectedArea.filename);
@@ -157,8 +155,7 @@ function AreasTab({
                       style={{ 
                         flex: 1, 
                         minHeight: '380px', 
-                        fontFamily: 'var(--font-mono)', 
-                        fontSize: '0.85rem', 
+                        fontSize: 'var(--text-sm)', 
                         lineHeight: '1.4', 
                         background: 'var(--bg-surface)', 
                         color: 'var(--text-primary)', 
@@ -186,7 +183,7 @@ function AreasTab({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '300px', color: 'var(--text-muted)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }} aria-hidden="true">folder_open</span>
               <p style={{ fontWeight: 600 }}>No Area Selected</p>
-              <p style={{ fontSize: '0.85rem' }}>Select an area from the left index panel to view or edit its records.</p>
+              <p style={{ fontSize: 'var(--text-sm)' }}>Select an area from the left index panel to view or edit its records.</p>
             </div>
           )}
         </div>

@@ -17,7 +17,7 @@ function ProjectsTab({
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title text-gradient-purple glitch-text">Projects Workspace</h1>
+        <h1 className="page-title">Projects</h1>
         <p className="page-subtitle">Obsidian Vault: Document Manager</p>
       </header>
 
@@ -34,7 +34,7 @@ function ProjectsTab({
                 type="text" 
                 placeholder="Search projects..." 
                 className="form-input" 
-                style={{ fontSize: '0.85rem' }} 
+                style={{ fontSize: 'var(--text-sm)' }} 
                 onChange={(e) => {
                   const term = e.target.value.toLowerCase();
                   document.querySelectorAll('.project-list-item').forEach(item => {
@@ -50,7 +50,7 @@ function ProjectsTab({
             </div>
 
             {projectsList.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No projects archived in vault.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No projects archived in vault.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.2rem' }}>
                 {projectsList.map((proj) => {
@@ -67,17 +67,16 @@ function ProjectsTab({
                       }}
                       style={{ 
                         cursor: 'pointer', 
-                        border: isSel ? '1px solid var(--accent-purple)' : '1px solid transparent',
-                        background: isSel ? 'rgba(188, 19, 254, 0.05)' : '',
-                        boxShadow: isSel ? '0 0 10px rgba(188, 19, 254, 0.15)' : 'none',
+                        border: isSel ? '1px solid var(--text-secondary)' : '1px solid transparent',
+                        background: isSel ? 'var(--surface-2)' : '',
                         padding: '0.75rem 1rem'
                       }}
                     >
                       <div className="item-meta">
-                        <span className="item-title" style={{ color: isSel ? 'var(--accent-purple)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
-                          📁 {proj.title}
+                        <span className="item-title" style={{ color: isSel ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
+                          {proj.title}
                         </span>
-                        <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>{proj.filename}</span>
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>{proj.filename}</span>
                       </div>
                     </div>
                   );
@@ -93,23 +92,23 @@ function ProjectsTab({
             <>
               <div className="panel-header" style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
-                  <h3 className="panel-title" style={{ color: 'var(--accent-purple)' }}>{selectedProject.replace('.md', '').replace(/_/g, ' ')}</h3>
-                  <span className="project-location-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location: 01_Projects/{selectedProject}</span>
+                  <h3 className="panel-title" style={{ color: 'var(--text-secondary)' }}>{selectedProject.replace('.md', '').replace(/_/g, ' ')}</h3>
+                  <span className="project-location-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Location: 01_Projects/{selectedProject}</span>
                 </div>
                 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {!isEditingProject ? (
                     <button 
                       className="btn-primary" 
-                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', height: 'auto', border: '1px solid var(--accent-purple)', background: 'transparent' }}
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto', border: '1px solid var(--text-secondary)', background: 'transparent' }}
                       onClick={() => setIsEditingProject(true)}
                     >
-                      📝 Edit Markdown
+                      Edit markdown
                     </button>
                   ) : (
                     <button 
                       className="btn-secondary" 
-                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', height: 'auto' }}
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto' }}
                       onClick={() => {
                         setIsEditingProject(false);
                         fetchProjectContent(selectedProject);
@@ -135,8 +134,7 @@ function ProjectsTab({
                       style={{ 
                         flex: 1, 
                         minHeight: '380px', 
-                        fontFamily: 'var(--font-mono)', 
-                        fontSize: '0.85rem', 
+                        fontSize: 'var(--text-sm)', 
                         lineHeight: '1.4', 
                         background: 'var(--bg-surface)', 
                         color: 'var(--text-primary)', 
@@ -164,7 +162,7 @@ function ProjectsTab({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '300px', color: 'var(--text-muted)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '1rem' }} aria-hidden="true">folder_open</span>
               <p style={{ fontWeight: 600 }}>No Project Selected</p>
-              <p style={{ fontSize: '0.85rem' }}>Select a project from the left index panel to view or edit its records.</p>
+              <p style={{ fontSize: 'var(--text-sm)' }}>Select a project from the left index panel to view or edit its records.</p>
             </div>
           )}
         </div>

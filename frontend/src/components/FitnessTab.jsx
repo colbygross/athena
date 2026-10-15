@@ -597,10 +597,10 @@ function FitnessTab({
       <header className="page-header" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title text-gradient-green glitch-text">Fitness & Health</h1>
-            <p className="page-subtitle font-mono">Athena Athletic Program</p>
+            <h1 className="page-title">Health</h1>
+            <p className="page-subtitle">Training program</p>
           </div>
-          <div style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--accent-green)' }}>
+          <div style={{ textAlign: 'right', fontFamily: 'inherit', fontSize: 'var(--text-xs)', color: 'var(--accent-green)' }}>
             <span>TODAY: {weeklySplit[todayIdx].dayName.toUpperCase()}</span>
           </div>
         </div>
@@ -609,32 +609,32 @@ function FitnessTab({
       {/* Sub Tabs Navigation */}
       <div className="health-subtab-bar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
         <button 
-          className={`health-subtab-btn font-mono ${healthSubTab === 'split' ? 'active' : ''}`}
+          className={`health-subtab-btn ${healthSubTab === 'split' ? 'active' : ''}`}
           onClick={() => setHealthSubTab('split')}
-          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'split' ? 'rgba(0, 255, 150, 0.1)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'split' ? '2px solid var(--accent-green)' : 'none', color: healthSubTab === 'split' ? 'var(--accent-green)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'split' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'split' ? '2px solid var(--accent-green)' : 'none', color: healthSubTab === 'split' ? 'var(--accent-green)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          ⚡ DUAL_SESSION_SPLIT
+          Dual session split
         </button>
         <button 
-          className={`health-subtab-btn font-mono ${healthSubTab === 'overload' ? 'active' : ''}`}
+          className={`health-subtab-btn ${healthSubTab === 'overload' ? 'active' : ''}`}
           onClick={() => setHealthSubTab('overload')}
-          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'overload' ? 'rgba(0, 240, 255, 0.1)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'overload' ? '2px solid var(--accent-cyan)' : 'none', color: healthSubTab === 'overload' ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'overload' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'overload' ? '2px solid var(--accent-cyan)' : 'none', color: healthSubTab === 'overload' ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          📈 PROGRESSIVE_OVERLOAD
+          Progressive overload
         </button>
         <button 
-          className={`health-subtab-btn font-mono ${healthSubTab === 'nutrition' ? 'active' : ''}`}
+          className={`health-subtab-btn ${healthSubTab === 'nutrition' ? 'active' : ''}`}
           onClick={() => setHealthSubTab('nutrition')}
-          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'nutrition' ? 'rgba(255, 186, 0, 0.1)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'nutrition' ? '2px solid var(--accent-yellow)' : 'none', color: healthSubTab === 'nutrition' ? 'var(--accent-yellow)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'nutrition' ? 'color-mix(in srgb, var(--color-warning) 10%, transparent)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'nutrition' ? '2px solid var(--accent-yellow)' : 'none', color: healthSubTab === 'nutrition' ? 'var(--accent-yellow)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          🥗 FUELING_&_MACROS
+          Fueling and macros
         </button>
         <button 
-          className={`health-subtab-btn font-mono ${healthSubTab === 'biometrics' ? 'active' : ''}`}
+          className={`health-subtab-btn ${healthSubTab === 'biometrics' ? 'active' : ''}`}
           onClick={() => setHealthSubTab('biometrics')}
-          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'biometrics' ? 'rgba(188, 19, 254, 0.1)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'biometrics' ? '2px solid var(--accent-purple)' : 'none', color: healthSubTab === 'biometrics' ? 'var(--accent-purple)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: healthSubTab === 'biometrics' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: healthSubTab === 'biometrics' ? '2px solid var(--text-secondary)' : 'none', color: healthSubTab === 'biometrics' ? 'var(--text-secondary)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          🧘 RECOVERY_&_BIOMETRICS
+          Recovery and biometrics
         </button>
       </div>
 
@@ -653,17 +653,16 @@ function FitnessTab({
                   className={`btn-secondary ${isSelected ? 'active' : ''}`}
                   style={{
                     padding: '0.6rem 0.3rem',
-                    fontSize: '0.75rem',
-                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-xs)',
                     border: isSelected ? '2px solid var(--accent-green)' : isToday ? '1px solid var(--accent-yellow)' : '1px solid var(--border-glass)',
-                    background: isSelected ? 'rgba(0, 255, 150, 0.15)' : 'rgba(0,0,0,0.2)',
+                    background: isSelected ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'rgba(0,0,0,0.2)',
                     color: isSelected ? 'var(--accent-green)' : isToday ? 'var(--accent-yellow)' : 'var(--text-primary)',
                     cursor: 'pointer',
                     position: 'relative'
                   }}
                 >
                   <div style={{ fontWeight: 'bold' }}>{day.dayName.substring(0, 3).toUpperCase()}</div>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', opacity: 0.8, marginTop: '0.2rem' }}>
                     {idx === 0 ? "Upper A" : idx === 1 ? "Kickbox" : idx === 2 ? "Lower A" : idx === 3 ? "Rest" : idx === 4 ? "Upper B" : idx === 5 ? "Lower B" : "Yoga"}
                   </div>
                   {isToday && (
@@ -675,15 +674,15 @@ function FitnessTab({
           </div>
 
           {/* Selected Day Header */}
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid var(--accent-green)' }}>
+          <div className="glass-panel" style={{ padding: '1rem', }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 className="panel-title" style={{ fontSize: '1.2rem', color: 'var(--accent-green)' }}>{currentDay.dayName}: {currentDay.title}</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+                <h3 className="panel-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--accent-green)' }}>{currentDay.dayName}: {currentDay.title}</h3>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
                   Structure: AM Non-Negotiable Anchor + PM Complementary Session (Low-CNS)
                 </p>
               </div>
-              <span className="badge badge-success" style={{ fontFamily: 'monospace' }}>
+              <span className="badge badge-success" style={{ fontFamily: 'inherit' }}>
                 {selectedDayIdx === todayIdx ? "TODAY'S SCHEDULE" : `DAY ${selectedDayIdx + 1} OF 7`}
               </span>
             </div>
@@ -693,33 +692,33 @@ function FitnessTab({
           <div className="grid-2col">
             {/* AM Primary Session Card */}
             <div className="glass-panel" style={{ border: '1px solid var(--accent-cyan)' }}>
-              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0, 240, 255, 0.08)' }}>
-                <h4 className="panel-title" style={{ color: 'var(--accent-cyan)', fontSize: '0.95rem' }}>
-                  🌅 {currentDay.amSession.name}
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)' }}>
+                <h4 className="panel-title" style={{ color: 'var(--accent-cyan)', fontSize: 'var(--text-sm)' }}>
+                  {currentDay.amSession.name}
                 </h4>
                 <button 
                   onClick={() => handleLogSession(selectedDayIdx, 'am')}
                   className="btn-primary" 
-                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: 'var(--text-xs)', fontWeight: 'bold' }}
                 >
                   LOG AM WORKOUT
                 </button>
               </div>
               <div className="panel-content" style={{ padding: '1rem' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
                   <strong>Goal:</strong> {currentDay.amSession.goal}
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {currentDay.amSession.sections.map((sec, sIdx) => (
                     <div key={sIdx}>
-                      <h5 style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)', marginBottom: '0.4rem', fontFamily: 'monospace' }}>{sec.name}</h5>
+                      <h5 style={{ fontSize: 'var(--text-xs)', color: 'var(--accent-yellow)', marginBottom: '0.4rem', fontFamily: 'inherit' }}>{sec.name}</h5>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         {sec.exercises.map((ex, eIdx) => {
                           const exKey = `${sIdx}-${eIdx}`;
                           const isChecked = !!checkedExercises[`${selectedDayIdx}-am-${exKey}`];
                           return (
-                            <label key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                            <label key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
                               <input 
                                 type="checkbox" 
                                 checked={isChecked} 
@@ -740,41 +739,41 @@ function FitnessTab({
             </div>
 
             {/* PM Secondary Session Card */}
-            <div className="glass-panel" style={{ border: '1px solid var(--accent-purple)' }}>
-              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(188, 19, 254, 0.08)' }}>
-                <h4 className="panel-title" style={{ color: 'var(--accent-purple)', fontSize: '0.95rem' }}>
-                  🌙 {currentDay.pmSession.name}
+            <div className="glass-panel" style={{ border: '1px solid var(--text-secondary)' }}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)' }}>
+                <h4 className="panel-title" style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+                  {currentDay.pmSession.name}
                 </h4>
                 {currentDay.pmSession.duration > 0 && (
                   <button 
                     onClick={() => handleLogSession(selectedDayIdx, 'pm')}
                     className="btn-primary" 
-                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: 'var(--text-xs)', fontWeight: 'bold' }}
                   >
                     LOG PM WORKOUT
                   </button>
                 )}
               </div>
               <div className="panel-content" style={{ padding: '1rem' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
                   <strong>Goal:</strong> {currentDay.pmSession.goal}
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {currentDay.pmSession.sections.map((sec, sIdx) => (
                     <div key={sIdx}>
-                      <h5 style={{ fontSize: '0.8rem', color: 'var(--accent-pink)', marginBottom: '0.4rem', fontFamily: 'monospace' }}>{sec.name}</h5>
+                      <h5 style={{ fontSize: 'var(--text-xs)', color: 'var(--accent-pink)', marginBottom: '0.4rem', fontFamily: 'inherit' }}>{sec.name}</h5>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         {sec.exercises.map((ex, eIdx) => {
                           const exKey = `${sIdx}-${eIdx}`;
                           const isChecked = !!checkedExercises[`${selectedDayIdx}-pm-${exKey}`];
                           return (
-                            <label key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                            <label key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
                               <input 
                                 type="checkbox" 
                                 checked={isChecked} 
                                 onChange={e => handleExerciseCheck(selectedDayIdx, 'pm', exKey, e.target.checked)}
-                                style={{ marginTop: '0.2rem', accentColor: 'var(--accent-purple)' }}
+                                style={{ marginTop: '0.2rem', accentColor: 'var(--text-secondary)' }}
                               />
                               <span style={{ color: isChecked ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isChecked ? 'line-through' : 'none' }}>
                                 {ex}
@@ -795,11 +794,11 @@ function FitnessTab({
       {/* SUBTAB 2: PROGRESSIVE OVERLOAD & DOUBLE PROGRESSION */}
       {healthSubTab === 'overload' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid var(--accent-cyan)' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem', }}>
             <h3 className="panel-title" style={{ color: 'var(--accent-cyan)', marginBottom: '0.5rem' }}>
               The Double Progression System & Auto-Regulation Strategy
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
               Designed for experienced lifters returning after a break. Instead of trying to add weight every week (which leads to plateaus and joint fatigue), follow this two-phase cycle.
             </p>
           </div>
@@ -808,10 +807,10 @@ function FitnessTab({
             {/* Overload Rules Matrix */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>Progressive Overload Variable by Exercise Type</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Progressive Overload Variable by Exercise Type</h4>
               </div>
               <div className="panel-content" style={{ padding: '1rem' }}>
-                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <table style={{ width: '100%', fontSize: 'var(--text-xs)', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-glass)', textAlign: 'left', color: 'var(--accent-cyan)' }}>
                       <th style={{ padding: '0.5rem' }}>Movement Type</th>
@@ -821,19 +820,19 @@ function FitnessTab({
                   </thead>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Heavy Barbell Compounds<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Squats, Bench, OHP, RDLs</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Heavy Barbell Compounds<br/><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Squats, Bench, OHP, RDLs</span></td>
                       <td style={{ padding: '0.5rem' }}>Weight First (Double Progression)</td>
                       <td style={{ padding: '0.5rem', color: 'var(--accent-green)' }}>+5–10 lbs once top reps are hit</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Dumbbell & Cable Accessories<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incline DB, Rows, Pulldowns</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Dumbbell & Cable Accessories<br/><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Incline DB, Rows, Pulldowns</span></td>
                       <td style={{ padding: '0.5rem' }}>Reps & Form First</td>
                       <td style={{ padding: '0.5rem', color: 'var(--accent-yellow)' }}>+2.5–5 lbs per side / plate notch</td>
                     </tr>
                     <tr>
-                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Isolation & Machines<br/><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Lateral Raises, Leg Curls, Arms</span></td>
+                      <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>Isolation & Machines<br/><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Lateral Raises, Leg Curls, Arms</span></td>
                       <td style={{ padding: '0.5rem' }}>Time Under Tension & Volume</td>
-                      <td style={{ padding: '0.5rem', color: 'var(--accent-purple)' }}>+1–2 reps or 2s slow eccentric</td>
+                      <td style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>+1–2 reps or 2s slow eccentric</td>
                     </tr>
                   </tbody>
                 </table>
@@ -843,24 +842,24 @@ function FitnessTab({
             {/* RIR Auto-Regulation & 3 Lock-In Rules */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>RIR & Fatigue Management Timeline</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>RIR & Fatigue Management Timeline</h4>
               </div>
               <div className="panel-content" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent-green)' }}>WEEKS 1–3 (RIR 2–3)</span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--accent-green)' }}>WEEKS 1–3 (RIR 2–3)</span>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
                     Leave 2–3 clean reps in the tank on every set. Rebuilds tendon capacity and prevents debilitating soreness.
                   </p>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent-yellow)' }}>WEEKS 4–5 (RIR 1–2)</span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--accent-yellow)' }}>WEEKS 4–5 (RIR 1–2)</span>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
                     Push closer to technical failure on your final work set of each movement.
                   </p>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent-purple)' }}>WEEK 6 (DELOAD WEEK)</span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Week 6 (deload)</span>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
                     Cut total weight by 20% and set volume by half to allow joints and nervous system to supercompensate.
                   </p>
                 </div>
@@ -875,25 +874,25 @@ function FitnessTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Daily Macronutrient & Hydration Targets Banner */}
           <div className="grid-4col">
-            <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-green)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY PROTEIN</span>
-              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: '1.3rem' }}>180–200g</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1.0g per lb (Muscle repair & striking)</span>
+            <div className="glass-panel" style={{ padding: '0.75rem', }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Daily protein</span>
+              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: 'var(--text-lg)' }}>180–200g</h3>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>1.0g per lb (Muscle repair & striking)</span>
             </div>
-            <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DAILY CARBS</span>
-              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: '1.3rem' }}>270–360g</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1.5-2.0g per lb (Heavy glycogen fuel)</span>
+            <div className="glass-panel" style={{ padding: '0.75rem', }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Daily carbs</span>
+              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: 'var(--text-lg)' }}>270–360g</h3>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>1.5-2.0g per lb (Heavy glycogen fuel)</span>
             </div>
-            <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-pink)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEALTHY FATS</span>
-              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-pink)', fontSize: '1.3rem' }}>60–80g</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>0.35-0.4g per lb (Joints & hormones)</span>
+            <div className="glass-panel" style={{ padding: '0.75rem', }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Healthy fats</span>
+              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-pink)', fontSize: 'var(--text-lg)' }}>60–80g</h3>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>0.35-0.4g per lb (Joints & hormones)</span>
             </div>
-            <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-cyan)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HYDRATION RULE</span>
-              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: '1.3rem' }}>128 oz (1 Gal)</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+1-2 Electrolyte packets Tue/Sat</span>
+            <div className="glass-panel" style={{ padding: '0.75rem', }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Hydration rule</span>
+              <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: 'var(--text-lg)' }}>128 oz (1 Gal)</h3>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>+1-2 Electrolyte packets Tue/Sat</span>
             </div>
           </div>
 
@@ -901,9 +900,9 @@ function FitnessTab({
             {/* Meal Timeline */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>Dual-Session Daily Fueling Timeline</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Dual-Session Daily Fueling Timeline</h4>
               </div>
-              <div className="panel-content" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8rem' }}>
+              <div className="panel-content" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: 'var(--text-xs)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-glass)' }}>
                   <span style={{ color: 'var(--accent-yellow)', fontWeight: 'bold' }}>5:30 AM — Pre-AM Fast Fuel</span>
                   <span>1 Banana or Sourdough + Honey + 16 oz Electrolyte Water</span>
@@ -917,7 +916,7 @@ function FitnessTab({
                   <span>6-8 oz Chicken/Turkey + 1.5c Jasmine Rice/Sweet Potato + Broccoli</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-glass)' }}>
-                  <span style={{ color: 'var(--accent-purple)', fontWeight: 'bold' }}>4:30 PM — Pre-PM Snack</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>4:30 PM — Pre-PM Snack</span>
                   <span>Rice cakes + Peanut Butter + Banana OR Greek Yogurt + Granola</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-glass)' }}>
@@ -934,7 +933,7 @@ function FitnessTab({
             {/* Meal Logger Form */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>Log Fuel / Meal Entry</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Log Fuel / Meal Entry</h4>
               </div>
               <div className="panel-content" style={{ padding: '1rem' }}>
                 <form onSubmit={(e) => {
@@ -993,10 +992,10 @@ function FitnessTab({
       {healthSubTab === 'biometrics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Sunday Recovery Guide */}
-          <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid var(--accent-purple)' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem', }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <h3 className="panel-title" style={{ color: 'var(--accent-purple)' }}>
-                🧘 Sunday Athlete Recovery Flow (60 Mins)
+              <h3 className="panel-title" style={{ color: 'var(--text-secondary)' }}>
+                Sunday recovery flow (60 min)
               </h3>
               <button 
                 onClick={() => {
@@ -1008,12 +1007,12 @@ function FitnessTab({
                   );
                 }}
                 className="btn-primary"
-                style={{ background: 'var(--accent-purple)', color: '#fff', fontSize: '0.75rem' }}
+                style={{ background: 'var(--text-secondary)', color: '#fff', fontSize: 'var(--text-xs)' }}
               >
-                LOG SUNDAY YOGA FLOW
+                Log yoga flow
               </button>
             </div>
-            <div className="grid-4col" style={{ gap: '0.5rem', fontSize: '0.75rem' }}>
+            <div className="grid-4col" style={{ gap: '0.5rem', fontSize: 'var(--text-xs)' }}>
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
                 <strong style={{ color: 'var(--accent-cyan)' }}>Phase 1 (10m): Spinal Decompression</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Child's pose lat reach (3m), Cat-Cow to thread needle (4m), Down Dog pedals (3m)</p>
@@ -1027,7 +1026,7 @@ function FitnessTab({
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Pigeon Pose (3m/side), Frog Pose (4m), Lying Hero (4m), Puppy Pose (3m), Reclined Twist (4m)</p>
               </div>
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '0.5rem', borderRadius: '4px' }}>
-                <strong style={{ color: 'var(--accent-purple)' }}>Phase 4 (10m): Parasympathetic</strong>
+                <strong style={{ color: 'var(--text-secondary)' }}>Phase 4 (10m): Parasympathetic</strong>
                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>Legs-Up-The-Wall Savasana (10m) with 4s inhale / 6s exhale tempo</p>
               </div>
             </div>
@@ -1037,7 +1036,7 @@ function FitnessTab({
             {/* Biometrics Form */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>Log Daily Biometrics & Sleep</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Log Daily Biometrics & Sleep</h4>
               </div>
               <div className="panel-content" style={{ padding: '1rem' }}>
                 <form onSubmit={(e) => {
@@ -1101,21 +1100,21 @@ function FitnessTab({
             {/* Workout History */}
             <div className="glass-panel">
               <div className="panel-header">
-                <h4 className="panel-title" style={{ fontSize: '0.9rem' }}>Recent Workout Logs</h4>
+                <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Recent Workout Logs</h4>
               </div>
               <div className="panel-content" style={{ padding: '1rem', maxHeight: '350px', overflowY: 'auto' }}>
                 {fitnessData.logs.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No workouts logged yet.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>No workouts logged yet.</p>
                 ) : (
                   <div className="item-list">
                     {fitnessData.logs.map((wk) => (
                       <div key={wk.id} className="list-item" style={{ padding: '0.5rem', marginBottom: '0.35rem' }}>
                         <div className="item-meta">
-                          <span className="item-title" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{wk.activity_type.toUpperCase()}</span>
-                          <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>
+                          <span className="item-title" style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold' }}>{wk.activity_type.toUpperCase()}</span>
+                          <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>
                             {wk.date} • {wk.duration_minutes} mins • {wk.calories_burned} kcal
                           </span>
-                          {wk.notes && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>{wk.notes}</span>}
+                          {wk.notes && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>{wk.notes}</span>}
                         </div>
                       </div>
                     ))}

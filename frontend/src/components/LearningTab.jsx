@@ -18,7 +18,7 @@ function LearningTab({ learningData, handleFormSubmit, renderRelatedAreas }) {
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title text-gradient-purple glitch-text">Learning Tracker</h1>
+        <h1 className="page-title">Learning</h1>
         <p className="page-subtitle">CS Study: Algorithms // Systems Breach</p>
       </header>
 
@@ -46,8 +46,8 @@ function LearningTab({ learningData, handleFormSubmit, renderRelatedAreas }) {
                         </span>
                       )}
                       {log.source_link && (
-                        <span className="learn-log-link" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                          🔗 <a href={log.source_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
+                        <span className="learn-log-link" style={{ fontSize: 'var(--text-xs)', marginTop: '0.25rem' }}>
+                          <a href={log.source_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
                             Reference Link / Materials
                           </a>
                         </span>

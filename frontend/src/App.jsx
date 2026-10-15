@@ -318,10 +318,10 @@ function App() {
     const related = areasList.filter(area => area.category.toLowerCase() === categoryName.toLowerCase());
     if (related.length === 0) return null;
     return (
-      <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', border: '1px solid rgba(188, 19, 254, 0.15)' }}>
+      <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', border: '1px solid var(--surface-2)' }}>
         <div className="panel-header" style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="material-symbols-outlined" style={{ color: 'var(--accent-purple)', fontSize: '1.2rem' }} aria-hidden="true">folder_shared</span>
-          <h4 className="panel-title" style={{ fontSize: '0.9rem', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>Related Documents</h4>
+          <span className="material-symbols-outlined" style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-lg)' }} aria-hidden="true">folder_shared</span>
+          <h4 className="panel-title" style={{ fontSize: 'var(--text-sm)', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>Related Documents</h4>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {related.map(item => (
@@ -343,7 +343,7 @@ function App() {
                 textAlign: 'left',
                 font: 'inherit',
                 color: 'var(--text-primary)',
-                fontSize: '0.85rem',
+                fontSize: 'var(--text-sm)',
                 textDecoration: 'none',
                 padding: '0.4rem 0.6rem',
                 borderRadius: '4px',
@@ -351,9 +351,9 @@ function App() {
               }}
               className="list-item"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }} aria-hidden="true">description</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }} aria-hidden="true">description</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({item.category})</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>({item.category})</span>
             </button>
           ))}
         </div>
@@ -588,8 +588,8 @@ function App() {
         resetForm(defaultValue);
         fetchAllData();
       }
-    } catch (err) {
-      showToast("Error logging entry: " + err, "error");
+    } catch {
+      showToast("Couldn't log the entry. Try again.", "error");
     }
   };
 
@@ -607,7 +607,7 @@ function App() {
   };
 
   const deleteTask = async (taskId) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
+    if (!confirm("Delete this task? This can't be undone.")) return;
     try {
       const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
         method: 'DELETE'
@@ -621,7 +621,7 @@ function App() {
   };
 
   const deleteCalendarEvent = async (eventId) => {
-    if (!confirm("Are you sure you want to delete this event?")) return;
+    if (!confirm("Delete this event? This can't be undone.")) return;
     try {
       const res = await fetch(`${API_BASE}/calendar/${eventId}`, {
         method: 'DELETE'
@@ -689,7 +689,7 @@ function App() {
       )}
 
       {/* Main Panel Content with Hologram Boot Flicker */}
-      <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''} flicker-effect`} key={activeTab}>
+      <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''}`} key={activeTab}>
         
         {/* TAB: CALENDAR & TASKS */}
         {activeTab === 'calendar-tasks' && (
@@ -780,6 +780,7 @@ function App() {
             careerData={careerData}
             handleFormSubmit={handleFormSubmit}
             renderRelatedAreas={renderRelatedAreas}
+            showToast={showToast}
           />
         )}
 

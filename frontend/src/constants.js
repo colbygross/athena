@@ -8,3 +8,6 @@ export const formatLocalDate = (date) => {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
+
+// Calendar event colors: muted, and readable on both themes.
+export const EVENT_COLORS = ['#5B8FD9', '#3FAE8C', '#D9775B', '#A88BD6', '#D6A640', '#8E96A3'];

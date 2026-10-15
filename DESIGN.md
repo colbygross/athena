@@ -1,58 +1,75 @@
-# Design System Document: Hermes Tactical Workspace
+# Athena design system
 
-## 1. Overview & Creative North Star: "Neural Command HUD"
-This design system represents a shared workspace between the user (Archer / Chief) and the AI companion (Hermes / Cortana). It bridges the gap between high-tech military HUDs and cybernetic hacker consoles.
+Athena is a personal dashboard. It should read as a calm, finished tool: black or near-black surfaces, one warm accent, and plain words. This file describes the system as shipped in `frontend/src/index.css`.
 
-**Creative North Star: Neural Command HUD**
-The interface feels like a diagnostic cockpit: ultra-clean, structured, and clinically efficient, but with a living digital presence. The backdrop is comfortable for daily viewing, while key metrics and links pop with soft holographic glows.
+## Themes
 
-**Core Design Principles:**
-- **Shared Workspace**: Distinct indicators showing what Hermes is tracking vs. what the user enters.
-- **Sophisticated Cybernetics**: No cartoonish glitching; animations are restricted to ambient pulses and clean transition flickers.
-- **Data Denseness**: The layout packs diagnostic logs and charts tightly, separated by fine glowing dashed borders.
+Stark Dark is the default. Stark Light, Soft Dark and Soft Light are set with a class on `<html>`. Every color below is a token on `:root` (or a theme class), so components never hard-code color.
 
----
+## Color
 
-## 2. Colors: High-Contrast Tech-Noir
-The color space uses a dark foundation with glowing cyan and acid-green accents to represent the dual partnership.
+| Token | Stark Dark | Stark Light | Use |
+| --- | --- | --- | --- |
+| `--text-primary` | `#FFFFFF` (21:1) | `#0A0A0A` | Body and headings |
+| `--text-secondary` | `#B0B0B0` (9.7:1) | `#333333` | Labels, secondary copy |
+| `--text-muted` | `#8A8A8A` (6.1:1) | `#595959` | Captions, metadata |
+| `--accent-wood` | `#A67B5B` | n/a | Brand accent |
+| `--focus-ring` | `#C4956F` (7.9:1) | `#8A5A36` (5.8:1) | Keyboard focus |
+| `--color-success` | `#5CC98A` (10.2:1) | `#15803D` | Income, done |
+| `--color-danger` | `#F07A6E` (7.7:1) | `#B91C1C` | Overspend, errors |
+| `--color-warning` | `#E0B25A` (10.7:1) | `#B45309` | Due soon, applied |
 
-### Color Tokens:
-- **Background (`#070a12`):** A deep obsidian slate that reduces eye strain and provides perfect contrast for glows.
-- **Panels (`rgba(0, 242, 254, 0.02)`):** Ultra-transparent layers with a heavy blur backdrop to simulate optical holographic glass.
-- **Primary Accent (`#00f2fe` - Cortana Cyan):** Used for navigation, active links, neural signals, and Hermes status updates.
-- **Secondary Accent (`#39ff14` - DedSec Toxic Green):** Used for database transaction logs, study metrics, and completed streaks.
-- **Warning Accent (`#ff007f` - Cyber Pink):** Reserved for alerts, budget overruns, and missed habits.
+Surfaces are shade steps, not outlines:
 
-### Borders & Dividers:
-- Containers use a 1px dashed border (`border: 1px dashed rgba(0, 242, 254, 0.25)`).
-- Hovering over panels activates a pink/cyan glow: `box-shadow: 0 0 15px rgba(0, 242, 254, 0.2)`.
+| Token | Stark Dark | Stark Light | Use |
+| --- | --- | --- | --- |
+| `--surface-0` | `#000000` | `#FFFFFF` | Page |
+| `--surface-1` | `#0E0E0E` | `#F5F5F7` | Panels, cards, list rows |
+| `--surface-2` | `#161616` | `#ECECEF` | Hover, selected row, chips |
 
----
+Soft themes define the same three steps. Tints of status colors are made with `color-mix(in srgb, var(--color-success) 12%, transparent)`, not hard-coded rgba.
 
-## 3. Typography: HUD Readout
-A clean pairing of a geometric display font and a highly legible terminal monospace font.
+Calendar event colors come from `EVENT_COLORS` in `src/constants.js`: six muted hues, shown as a small dot before the event title.
 
-- **Display Headers (Outfit):** Wide-set, geometric, and uppercase. Slanted style or brackets are used for main headers (e.g. `[ ARCHER_HERMES_LINK ]`).
-- **Body & Data Lines (Share Tech Mono / JetBrains Mono):** All list items, numbers, parameters, form labels, and log entries are displayed in monospaced format to resemble system telemetry.
+## Type
 
----
+Three roles, defined as tokens:
 
-## 4. Components
+- `--font-display` (KH Interference): page titles (`h1`, `.page-title`), the wordmark and large stat numbers. Nothing else.
+- `--font-text` (PP Fraktion Mono): all other text. Body, navigation, panel titles, buttons, labels, list items.
+- `--font-mono` (PP Fraktion Mono): figures that must line up: amounts, times and durations, with `tabular-nums`. Same face as `--font-text`, kept as its own token for figures.
 
-### Navigation Buttons & Tabs:
-- Tabs are blocky. Active tabs are fully colored in cyan/green with black text and an outer glow.
-- Unfocused tabs have a simple dashed outline and change opacity on hover.
+Five sizes, and no others:
 
-### Stat Cards:
-- Framed in dashed borders. Top-right corners contain system tags like `[SYS_DAEMON]` or `[BIO_LINK]`.
-- Pulsing glow details in the corner of cards indicate active background syncing.
+| Token | Size | Use |
+| --- | --- | --- |
+| `--text-xs` | 0.75rem (12px) | Captions, badges, metadata. This is the floor. |
+| `--text-sm` | 0.875rem | Secondary body, form input |
+| `--text-md` | 1rem | Body and list titles |
+| `--text-lg` | 1.25rem | Panel titles |
+| `--text-xl` | 2rem | Page titles and big numbers |
 
-### Forms & Input Fields:
-- Blocky inputs with solid black background and a dashed border. Focus shifts the border to neon pink with a subtle glow.
-- Checkboxes are small block squares with custom check indicators.
+Labels are sentence case, with no uppercase and no letter-spacing.
 
----
+## Surfaces and borders
 
-## 5. Screen Transitions: Boot Sequence
-- Moving between tabs triggers a 300ms digital "flicker" effect that mimics a hologram rebooting.
-- A vertical scanline sweeps across the screen every 6 seconds as a background diagnostic overlay.
+- Panels, cards and list rows sit on `--surface-1` with no border. The shade change does the separating.
+- Borders are allowed on form fields, tables, and the tab bar's top edge. Use `--border-cyan` (1px).
+- Shadows are allowed only on things that float: dialogs, the toast stack and dropdowns.
+- No gradients, glow, glass blur, side-stripe accents, or neon. The one exception is the mobile tab bar, which may blur its background.
+
+## Focus, targets and motion
+
+- `:focus-visible` draws a 2px `--focus-ring` outline with a 2px offset on every interactive element. Do not remove it.
+- Text is 12px or larger.
+- Icons are Material Symbols with `aria-hidden="true"`. Icon-only buttons have an `aria-label`.
+- `prefers-reduced-motion` shortens all animations and transitions to near zero. Content stays; travel and pulses go.
+- Dialogs trap focus and close on Escape.
+
+## Copy
+
+- Use the names people know: Inbox, Projects, Areas, Resources, Learning, Career, Habits, Health, Net worth.
+- Sentence case for titles, labels and buttons. Buttons name the action: "Save changes", "Add task", "Run discovery".
+- No emoji as UI. Use a Material Symbol with a text label, or text alone.
+- Feedback is a toast (`showToast(message, 'success' | 'error')`), never `alert()`. Say what happened and what to do next. No "Error:" prefixes and no raw error objects.
+- Destructive confirms say what will be removed and whether it can be undone: "Delete this task? This can't be undone."

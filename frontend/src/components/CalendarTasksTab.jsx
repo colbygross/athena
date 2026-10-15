@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { activateOnKey } from '../a11y';
+import { EVENT_COLORS } from '../constants';
 
 function CalendarTasksTab({
   tasksData = [],
@@ -409,13 +410,13 @@ function CalendarTasksTab({
             className={`mobile-segmented-btn ${mobileTab === 'calendar' ? 'active' : ''}`}
             onClick={() => setMobileTab('calendar')}
           >
-            <span>📅</span> Calendar ({calendarData.length})
+            <span className="material-symbols-outlined" aria-hidden="true">calendar_month</span> Calendar ({calendarData.length})
           </button>
           <button 
             className={`mobile-segmented-btn ${mobileTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setMobileTab('tasks')}
           >
-            <span>📋</span> Tasks ({tasksData.filter(t => t.status === 'pending').length})
+            <span className="material-symbols-outlined" aria-hidden="true">checklist</span> Tasks ({tasksData.filter(t => t.status === 'pending').length})
           </button>
         </div>
       )}
@@ -444,21 +445,21 @@ function CalendarTasksTab({
                 <button 
                   className={`view-mode-btn ${viewMode === 'day' ? 'active' : ''}`}
                   onClick={() => setViewMode('day')}
-                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: '0.75rem' } : {}}
+                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: 'var(--text-xs)' } : {}}
                 >
                   Day
                 </button>
                 <button 
                   className={`view-mode-btn ${viewMode === 'week' ? 'active' : ''}`}
                   onClick={() => setViewMode('week')}
-                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: '0.75rem' } : {}}
+                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: 'var(--text-xs)' } : {}}
                 >
                   Week
                 </button>
                 <button 
                   className={`view-mode-btn ${viewMode === 'month' ? 'active' : ''}`}
                   onClick={() => setViewMode('month')}
-                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: '0.75rem' } : {}}
+                  style={isMobile ? { padding: '0.3rem 0.5rem', fontSize: 'var(--text-xs)' } : {}}
                 >
                   Month
                 </button>
@@ -467,7 +468,7 @@ function CalendarTasksTab({
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <button className="btn-secondary" onClick={handlePrev} style={{ padding: '0.25rem 0.6rem' }}>◀</button>
-              <button className="btn-secondary" onClick={handleToday} style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}>Today</button>
+              <button className="btn-secondary" onClick={handleToday} style={{ padding: '0.25rem 0.6rem', fontSize: 'var(--text-xs)' }}>Today</button>
               <button className="btn-secondary" onClick={handleNext} style={{ padding: '0.25rem 0.6rem' }}>▶</button>
             </div>
 
@@ -501,7 +502,7 @@ function CalendarTasksTab({
               style={{ 
                 width: isMobile ? '100%' : '180px', 
                 padding: '0.35rem 0.65rem', 
-                fontSize: '0.8rem' 
+                fontSize: 'var(--text-xs)' 
               }}
             />
 
@@ -515,14 +516,14 @@ function CalendarTasksTab({
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '0.35rem', 
-                  fontSize: '0.75rem', 
+                  fontSize: 'var(--text-xs)', 
                   padding: '0.35rem 0.75rem',
                   flex: isMobile ? 1 : 'none',
                   justifyContent: 'center'
                 }}
               >
                 <span style={{ display: 'inline-block', transform: isSyncingGoogle ? 'rotate(360deg)' : 'none', transition: 'transform 0.8s' }}>
-                  🔄
+                  <span className="material-symbols-outlined" aria-hidden="true">sync</span>
                 </span>
                 <span>{isSyncingGoogle ? 'Syncing...' : 'Sync'}</span>
               </button>
@@ -541,7 +542,7 @@ function CalendarTasksTab({
                   });
                   setActiveModal('new_task');
                 }}
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', flex: isMobile ? 1 : 'none' }}
+                style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', flex: isMobile ? 1 : 'none' }}
               >
                 + Task
               </button>
@@ -555,12 +556,12 @@ function CalendarTasksTab({
                     start_time: `${selectedDayStr} 10:00`,
                     end_time: `${selectedDayStr} 11:00`,
                     tags: [],
-                    color: '#4facfe',
+                    color: EVENT_COLORS[0],
                     sync_to_google: true
                   });
                   setActiveModal('new_event');
                 }}
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', flex: isMobile ? 1 : 'none' }}
+                style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', flex: isMobile ? 1 : 'none' }}
               >
                 + Event
               </button>
@@ -571,7 +572,7 @@ function CalendarTasksTab({
         {/* Event Tags Filter Row */}
         {(!isMobile || mobileTab === 'calendar') && (
           <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', overflowX: 'auto', paddingBottom: '2px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
               Tags:
             </span>
             <div className="tag-filter-bar" style={{ flexWrap: isMobile ? 'nowrap' : 'wrap', overflowX: isMobile ? 'auto' : 'visible' }}>
@@ -612,11 +613,11 @@ function CalendarTasksTab({
             {viewMode === 'day' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-cyan)', paddingBottom: '0.5rem' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
                     Hourly Schedule & Free Gaps
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    💡 Click any empty gap to view task recommendations
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                    Click any empty gap to see task suggestions
                   </div>
                 </div>
 
@@ -645,7 +646,7 @@ function CalendarTasksTab({
                           {/* Scheduled Events */}
                           {hourEvents.map(ev => {
                             const isGoogle = ev.source === 'google';
-                            const evColor = ev.color || '#4facfe';
+                            const evColor = ev.color || EVENT_COLORS[0];
                             const tags = Array.isArray(ev.tags) ? ev.tags : [];
                             const attachedCount = ev.attached_tasks?.length || 0;
 
@@ -653,32 +654,32 @@ function CalendarTasksTab({
                               <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                                 key={ev.id} 
                                 className="timeline-event-card"
-                                style={{ borderLeftColor: evColor }}
+                                style={{ '--event-color': evColor }}
                                 onClick={() => handleOpenEventDetail(ev)}
                               >
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflow: 'hidden' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                     <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ev.title}</span>
                                     {isGoogle && (
-                                      <span style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(66, 133, 244, 0.2)', color: '#4285F4' }}>
+                                      <span style={{ fontSize: 'var(--text-xs)', padding: '1px 4px', borderRadius: '3px', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
                                         Google
                                       </span>
                                     )}
                                     {attachedCount > 0 && (
-                                      <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)' }}>
-                                        📋 {attachedCount} tasks
+                                      <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)' }}>
+                                        {attachedCount} tasks
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    🕒 {ev.start_time.slice(11, 16)} – {ev.end_time.slice(11, 16)} {ev.description ? `• ${ev.description}` : ''}
+                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                                    {ev.start_time.slice(11, 16)} – {ev.end_time.slice(11, 16)} {ev.description ? `• ${ev.description}` : ''}
                                   </div>
                                 </div>
 
                                 {tags.length > 0 && (
                                   <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                                     {tags.map(t => (
-                                      <span key={t} style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                                      <span key={t} style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                                         {t}
                                       </span>
                                     ))}
@@ -695,12 +696,12 @@ function CalendarTasksTab({
                               className="timeline-gap-block"
                               onClick={() => handleOpenGap(gap)}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--accent-cyan)' }}>
-                                <span>💡</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--accent-cyan)' }}>
+                                <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
                                 <strong>{gap.duration_minutes}m Free Window</strong>
                                 <span style={{ color: 'var(--text-muted)' }}>({gap.start} – {gap.end})</span>
                               </div>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textDecoration: 'underline' }}>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', textDecoration: 'underline' }}>
                                 {gap.recommended_tasks.length > 0 ? `View ${gap.recommended_tasks.length} recommended tasks` : 'No tasks fit'}
                               </span>
                             </div>
@@ -734,10 +735,10 @@ function CalendarTasksTab({
                             transition: 'var(--transition-smooth)'
                           }}
                         >
-                          <div style={{ fontSize: '0.75rem', color: isToday ? 'var(--accent-cyan)' : 'var(--text-muted)', fontWeight: isToday ? 'bold' : 'normal' }}>
+                          <div style={{ fontSize: 'var(--text-xs)', color: isToday ? 'var(--accent-cyan)' : 'var(--text-muted)', fontWeight: isToday ? 'bold' : 'normal' }}>
                             {day.toLocaleDateString(undefined, { weekday: 'short' })}
                           </div>
-                          <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-primary)' }}>
                             {day.getDate()}
                           </div>
                         </div>
@@ -765,7 +766,7 @@ function CalendarTasksTab({
                           }}
                         >
                           {eventsForDay.length === 0 ? (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>
                               Free
                             </div>
                           ) : (
@@ -773,13 +774,13 @@ function CalendarTasksTab({
                               <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                                 key={ev.id}
                                 className="timeline-event-card"
-                                style={{ borderLeftColor: ev.color || '#4facfe', padding: '0.3rem 0.4rem', fontSize: '0.75rem' }}
+                                style={{ '--event-color': ev.color || EVENT_COLORS[0], padding: '0.3rem 0.4rem', fontSize: 'var(--text-xs)' }}
                                 onClick={() => handleOpenEventDetail(ev)}
                               >
                                 <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {ev.title}
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                                   {ev.start_time?.slice(11, 16)}
                                 </div>
                               </div>
@@ -796,7 +797,7 @@ function CalendarTasksTab({
             {/* --- 3. MONTH VIEW: CLASSIC CALENDAR GRID --- */}
             {viewMode === 'month' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', textAlign: 'center', fontWeight: 'bold', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', textAlign: 'center', fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d}>{d}</div>)}
                 </div>
 
@@ -828,7 +829,7 @@ function CalendarTasksTab({
                             <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
                               key={`ev-${ev.id}-${eIdx}`}
                               className="calendar-event-item"
-                              style={{ borderLeftColor: ev.color || '#4facfe' }}
+                              style={{ '--event-color': ev.color || EVENT_COLORS[0] }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenEventDetail(ev);
@@ -846,7 +847,7 @@ function CalendarTasksTab({
                                 toggleTask(task.id);
                               }}
                             >
-                              <span className="task-checkbox-icon">{task.status === 'completed' ? '☑' : '☐'}</span>
+                              <span className="material-symbols-outlined task-checkbox-icon" aria-hidden="true">{task.status === 'completed' ? 'check_box' : 'check_box_outline_blank'}</span>
                               <span className="task-text">{task.title}</span>
                             </div>
                           ))}
@@ -898,14 +899,14 @@ function CalendarTasksTab({
             {/* Tasks List */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.25rem' }}>
               {filteredTasks.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '2rem' }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-sm)', padding: '2rem' }}>
                   No tasks found in this section.
                 </div>
               ) : (
                 filteredTasks.map(task => {
                   const isCompleted = task.status === 'completed';
                   const isBlocked = task.is_blocked;
-                  const priorityColor = task.priority === 'high' ? 'var(--accent-pink)' : task.priority === 'low' ? 'var(--accent-purple)' : 'var(--accent-green)';
+                  const priorityColor = task.priority === 'high' ? 'var(--accent-pink)' : task.priority === 'low' ? 'var(--text-secondary)' : 'var(--accent-green)';
                   const subtasks = task.subtasks || [];
                   const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                   const isExpanded = !!expandedSubtasks[task.id];
@@ -920,7 +921,7 @@ function CalendarTasksTab({
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.4rem',
-                        borderLeft: isBlocked ? '3px solid #ffaa00' : '3px solid transparent'
+                        background: isBlocked ? 'var(--surface-2)' : undefined
                       }}
                     >
                       {/* Top Row: Checkbox, Title, Badges, Delete */}
@@ -930,12 +931,12 @@ function CalendarTasksTab({
                             type="checkbox" 
                             checked={isCompleted} 
                             onChange={() => toggleTask(task.id)}
-                            style={{ width: '1.05rem', height: '1.05rem', cursor: 'pointer', accentColor: 'var(--accent-purple)' }}
+                            style={{ width: '1.05rem', height: '1.05rem', cursor: 'pointer', accentColor: 'var(--text-secondary)' }}
                           />
                           <div style={{ flex: 1, overflow: 'hidden' }}>
                             <span style={{ 
                               textDecoration: isCompleted ? 'line-through' : 'none', 
-                              fontSize: '0.85rem', 
+                              fontSize: 'var(--text-sm)', 
                               color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)',
                               fontWeight: 500
                             }}>
@@ -959,40 +960,40 @@ function CalendarTasksTab({
                       {/* Middle Row: Duration, Priority, Due Date, Cadence Chips */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', paddingLeft: '1.55rem' }}>
                         {/* Duration estimate */}
-                        <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                          ⏱️ {task.estimated_minutes || 30}m
+                        <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                          {task.estimated_minutes || 30}m
                         </span>
 
                         {/* Priority */}
-                        <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(0,0,0,0.2)', border: `1px solid ${priorityColor}`, color: priorityColor }}>
+                        <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(0,0,0,0.2)', border: `1px solid ${priorityColor}`, color: priorityColor }}>
                           {task.priority?.toUpperCase()}
                         </span>
 
                         {/* Due date */}
                         {task.due_date && (
-                          <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
-                            📅 {task.due_date}
+                          <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
+                            {task.due_date}
                           </span>
                         )}
 
                         {/* Recurrence */}
                         {task.recurrence && task.recurrence !== 'none' && (
-                          <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(123, 97, 255, 0.15)', color: 'var(--accent-purple)' }}>
-                            🔄 {task.recurrence}
+                          <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                            {task.recurrence}
                           </span>
                         )}
 
                         {/* Blocked Pill */}
                         {isBlocked && (
-                          <span style={{ fontSize: '0.75rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(180, 83, 9, 0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', padding: '1px 6px', borderRadius: '3px', background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
                             ⏳ Waiting on: {task.unmet_prerequisites?.join(', ')}
                           </span>
                         )}
 
                         {/* Attached Event */}
                         {task.attached_event && (
-                          <span style={{ fontSize: '0.75rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(0, 242, 254, 0.15)', color: 'var(--accent-cyan)' }}>
-                            📌 Event: {task.attached_event.title}
+                          <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'var(--surface-2)', color: 'var(--accent-cyan)' }}>
+                            Event: {task.attached_event.title}
                           </span>
                         )}
 
@@ -1004,12 +1005,12 @@ function CalendarTasksTab({
                               background: 'transparent', 
                               border: 'none', 
                               color: 'var(--text-muted)', 
-                              fontSize: '0.75rem', 
+                              fontSize: 'var(--text-xs)', 
                               cursor: 'pointer',
                               padding: '1px 4px'
                             }}
                           >
-                            ☑ {completedSubtasks}/{subtasks.length} subtasks {isExpanded ? '▲' : '▼'}
+                            {completedSubtasks}/{subtasks.length} subtasks {isExpanded ? '▲' : '▼'}
                           </button>
                         )}
                       </div>
@@ -1018,13 +1019,13 @@ function CalendarTasksTab({
                       {isExpanded && (
                         <div style={{ paddingLeft: '1.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.25rem' }}>
                           {subtasks.map(st => (
-                            <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', fontSize: '0.75rem' }}>
+                            <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', fontSize: 'var(--text-xs)' }}>
                               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, cursor: 'pointer' }}>
                                 <input 
                                   type="checkbox" 
                                   checked={!!st.is_completed}
                                   onChange={() => toggleSubtask(task.id, st.id, st.is_completed)}
-                                  style={{ accentColor: 'var(--accent-purple)' }}
+                                  style={{ accentColor: 'var(--text-secondary)' }}
                                 />
                                 <span style={{ textDecoration: st.is_completed ? 'line-through' : 'none', color: st.is_completed ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                                   {st.title}
@@ -1033,7 +1034,7 @@ function CalendarTasksTab({
                               <button aria-label="Delete subtask" 
                                 className="btn-danger-icon" 
                                 onClick={() => deleteSubtask(task.id, st.id)}
-                                style={{ fontSize: '0.8rem' }}
+                                style={{ fontSize: 'var(--text-xs)' }}
                               >
                                 ×
                               </button>
@@ -1049,12 +1050,12 @@ function CalendarTasksTab({
                               value={newSubtaskInput[task.id] || ''}
                               onChange={e => setNewSubtaskInput({ ...newSubtaskInput, [task.id]: e.target.value })}
                               onKeyDown={e => { if (e.key === 'Enter') addSubtask(task.id); }}
-                              style={{ flex: 1, fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                              style={{ flex: 1, fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem' }}
                             />
                             <button aria-label="Add subtask" 
                               className="btn-secondary" 
                               onClick={() => addSubtask(task.id)}
-                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                              style={{ fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem' }}
                             >
                               +
                             </button>
@@ -1079,26 +1080,26 @@ function CalendarTasksTab({
           <div className="athena-modal-card" role="dialog" aria-modal="true" aria-label="Free time slot" onClick={e => e.stopPropagation()}>
             <div className="panel-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>💡</span>
+                <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
                 <div>
-                  <h3 className="panel-title" style={{ fontSize: '0.95rem', margin: 0 }}>
+                  <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)', margin: 0 }}>
                     Free Gap: {activeGap.duration_minutes} Minutes
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                     Available window: {activeGap.start} – {activeGap.end}
                   </span>
                 </div>
               </div>
-              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: '1.2rem' }}>×</button>
+              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: 'var(--text-lg)' }}>×</button>
             </div>
 
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
                 Here are your unblocked tasks that fit comfortably into this {activeGap.duration_minutes}-minute time slot:
               </p>
 
               {activeGap.recommended_tasks?.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
                   No unblocked tasks with duration ≤ {activeGap.duration_minutes} minutes found.
                 </div>
               ) : (
@@ -1117,11 +1118,11 @@ function CalendarTasksTab({
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
                           {t.title}
                         </span>
-                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          <span>⏱️ {t.estimated_minutes || 30}m</span>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                          <span>{t.estimated_minutes || 30}m</span>
                           <span>•</span>
                           <span style={{ color: t.priority === 'high' ? 'var(--accent-pink)' : 'var(--accent-green)' }}>
                             {t.priority?.toUpperCase()}
@@ -1136,7 +1137,7 @@ function CalendarTasksTab({
                           showToast(`Task "${t.title}" completed!`, "success");
                           setActiveModal(null);
                         }}
-                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
+                        style={{ fontSize: 'var(--text-xs)', padding: '0.3rem 0.65rem' }}
                       >
                         Complete
                       </button>
@@ -1145,8 +1146,8 @@ function CalendarTasksTab({
                 </div>
               )}
 
-              <div style={{ borderTop: '1px solid var(--border-cyan)', paddingTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                ℹ️ Note: Tasks stay separate from your calendar schedule. This gap helper lets you focus without cluttering your external calendar.
+              <div style={{ borderTop: '1px solid var(--border-cyan)', paddingTop: '0.75rem', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Note: tasks stay separate from your calendar schedule. This gap helper lets you focus without cluttering your external calendar.
               </div>
             </div>
           </div>
@@ -1159,31 +1160,31 @@ function CalendarTasksTab({
           <div className="athena-modal-card" role="dialog" aria-modal="true" aria-label={modalEvent.title} onClick={e => e.stopPropagation()}>
             <div className="panel-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 className="panel-title" style={{ fontSize: '1rem', margin: 0 }}>{modalEvent.title}</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  🕒 {modalEvent.start_time} – {modalEvent.end_time}
+                <h3 className="panel-title" style={{ fontSize: 'var(--text-md)', margin: 0 }}>{modalEvent.title}</h3>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  {modalEvent.start_time} – {modalEvent.end_time}
                 </span>
               </div>
-              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: '1.2rem' }}>×</button>
+              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: 'var(--text-lg)' }}>×</button>
             </div>
 
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {modalEvent.description && (
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>DESCRIPTION</div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>{modalEvent.description}</p>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>DESCRIPTION</div>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', margin: 0 }}>{modalEvent.description}</p>
                 </div>
               )}
 
               {/* Tags */}
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>TAGS</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>TAGS</div>
                 <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                   {(modalEvent.tags || []).length === 0 ? (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No tags attached</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>No tags attached</span>
                   ) : (
                     modalEvent.tags.map(t => (
-                      <span key={t} style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '999px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}>
+                      <span key={t} style={{ fontSize: 'var(--text-xs)', padding: '2px 8px', borderRadius: '999px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}>
                         {t}
                       </span>
                     ))
@@ -1193,15 +1194,15 @@ function CalendarTasksTab({
 
               {/* Attached Tasks */}
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
-                  ATTACHED TASKS ({(modalEvent.attached_tasks || []).length})
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                  Attached tasks ({(modalEvent.attached_tasks || []).length})
                 </div>
                 {(modalEvent.attached_tasks || []).length === 0 ? (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>No tasks attached to this event.</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>No tasks attached to this event.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {modalEvent.attached_tasks.map(at => (
-                      <div key={at.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                      <div key={at.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-xs)' }}>
                         <input 
                           type="checkbox" 
                           checked={at.status === 'completed'}
@@ -1209,7 +1210,7 @@ function CalendarTasksTab({
                             await toggleTask(at.id);
                             fetchAllData();
                           }}
-                          style={{ accentColor: 'var(--accent-purple)' }}
+                          style={{ accentColor: 'var(--text-secondary)' }}
                         />
                         <span style={{ textDecoration: at.status === 'completed' ? 'line-through' : 'none' }}>
                           {at.title}
@@ -1225,12 +1226,12 @@ function CalendarTasksTab({
                 <button 
                   className="btn-danger"
                   onClick={async () => {
-                    if (confirm("Are you sure you want to delete this event?")) {
+                    if (confirm("Delete this event? This can't be undone.")) {
                       await deleteCalendarEvent(modalEvent.id);
                       setActiveModal(null);
                     }
                   }}
-                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                  style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem' }}
                 >
                   Delete Event
                 </button>
@@ -1245,8 +1246,8 @@ function CalendarTasksTab({
         <div className="athena-modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="athena-modal-card" role="dialog" aria-modal="true" aria-label="New task" onClick={e => e.stopPropagation()}>
             <div className="panel-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.95rem', margin: 0 }}>New Task</h3>
-              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: '1.2rem' }}>×</button>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)', margin: 0 }}>New Task</h3>
+              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: 'var(--text-lg)' }}>×</button>
             </div>
 
             <form onSubmit={async (e) => {
@@ -1287,9 +1288,9 @@ function CalendarTasksTab({
                     value={modalTask.priority}
                     onChange={e => setModalTask({ ...modalTask, priority: e.target.value })}
                   >
-                    <option value="high">🔴 High</option>
-                    <option value="medium">🟡 Medium</option>
-                    <option value="low">🔵 Low</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
                   </select>
                 </div>
 
@@ -1300,11 +1301,11 @@ function CalendarTasksTab({
                     value={modalTask.estimated_minutes}
                     onChange={e => setModalTask({ ...modalTask, estimated_minutes: parseInt(e.target.value) })}
                   >
-                    <option value={15}>⏱️ 15 mins</option>
-                    <option value={30}>⏱️ 30 mins</option>
-                    <option value={45}>⏱️ 45 mins</option>
-                    <option value={60}>⏱️ 1 hour</option>
-                    <option value={120}>⏱️ 2 hours</option>
+                    <option value={15}>15 mins</option>
+                    <option value={30}>30 mins</option>
+                    <option value={45}>45 mins</option>
+                    <option value={60}>1 hour</option>
+                    <option value={120}>2 hours</option>
                   </select>
                 </div>
               </div>
@@ -1318,9 +1319,9 @@ function CalendarTasksTab({
                     onChange={e => setModalTask({ ...modalTask, recurrence: e.target.value })}
                   >
                     <option value="none">One-off task</option>
-                    <option value="daily">🔄 Daily</option>
-                    <option value="weekly">🔄 Weekly</option>
-                    <option value="monthly">🔄 Monthly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
                   </select>
                 </div>
 
@@ -1391,8 +1392,8 @@ function CalendarTasksTab({
         <div className="athena-modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="athena-modal-card" role="dialog" aria-modal="true" aria-label="New calendar event" onClick={e => e.stopPropagation()}>
             <div className="panel-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.95rem', margin: 0 }}>New Calendar Event</h3>
-              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: '1.2rem' }}>×</button>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)', margin: 0 }}>New Calendar Event</h3>
+              <button aria-label="Close" className="btn-danger-icon" onClick={() => setActiveModal(null)} style={{ fontSize: 'var(--text-lg)' }}>×</button>
             </div>
 
             <form onSubmit={async (e) => {
@@ -1464,7 +1465,7 @@ function CalendarTasksTab({
               <div className="form-group">
                 <label className="form-label">Color Accent</label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  {['#4facfe', '#00f2fe', '#ff007f', '#7b61ff', '#39ff14', '#ffe600'].map(col => (
+                  {EVENT_COLORS.map(col => (
                     <button aria-label={`Event color ${col}`} aria-pressed={modalEvent?.color === col} 
                       key={col}
                       type="button"
@@ -1516,10 +1517,10 @@ function CalendarTasksTab({
                   id="syncGoogleCheckbox"
                   checked={!!modalEvent.sync_to_google}
                   onChange={e => setModalEvent({ ...modalEvent, sync_to_google: e.target.checked })}
-                  style={{ accentColor: 'var(--accent-purple)' }}
+                  style={{ accentColor: 'var(--text-secondary)' }}
                 />
-                <label htmlFor="syncGoogleCheckbox" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  Sync event to Google Calendar (2-Way)
+                <label htmlFor="syncGoogleCheckbox" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  Sync to Google Calendar
                 </label>
               </div>
 
