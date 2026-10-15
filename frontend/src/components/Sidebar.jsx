@@ -23,7 +23,7 @@ function Sidebar({
           aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!sidebarCollapsed}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }} aria-hidden="true">
+          <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-lg)' }} aria-hidden="true">
             {sidebarCollapsed ? "menu_open" : "menu"}
           </span>
         </button>
@@ -67,11 +67,6 @@ function Sidebar({
         <div className="user-avatar" aria-hidden="true">CS</div>
         <div className="user-info">
           <span className="user-name">Archer</span>
-          <span className="user-role">Neural Partner</span>
-          <span className="sys-diagnostic-text">
-            <span className="sys-diagnostic-dot" aria-hidden="true"></span>
-            [ATHENA_LINK_ON]
-          </span>
         </div>
         <button
           type="button"

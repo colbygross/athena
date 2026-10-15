@@ -18,11 +18,11 @@ function QuickLog({ API_BASE, showToast, onLogged, inputRef }) {
 
       if (res.status === 'success') {
         const p = res.parsed;
-        showToast(`✓ Logged: $${p.amount.toFixed(2)} at ${p.merchant} (${p.category})`, "success");
+        showToast(`Logged: $${p.amount.toFixed(2)} at ${p.merchant} (${p.category})`, "success");
         setNlpInput('');
         onLogged();
       } else {
-        showToast("Error: " + (res.detail || "Failed to parse transaction"), "error");
+        showToast(res.detail || "Couldn't read that entry. Try rephrasing it.", "error");
       }
     } catch (err) {
       showToast("Error logging natural language transaction: " + err, "error");
@@ -36,7 +36,7 @@ function QuickLog({ API_BASE, showToast, onLogged, inputRef }) {
       <div className="quick-log-header">
         <span className="material-symbols-outlined quick-log-icon" aria-hidden="true">auto_awesome</span>
         <label htmlFor="quick-log-input" className="quick-log-label">
-          NATURAL LANGUAGE LOG // qwen2.5-coder:3b
+          Describe a transaction
         </label>
       </div>
       <form onSubmit={handleNlpSubmit} className="quick-log-form">

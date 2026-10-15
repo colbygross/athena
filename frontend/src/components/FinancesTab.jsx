@@ -56,7 +56,7 @@ function FinancesTab({
   // Financial Operation Helpers
   const deleteTransaction = async (txId, merchant, amount) => {
     const label = merchant ? `"${merchant}" ($${Number(amount).toFixed(2)})` : `$${Number(amount).toFixed(2)}`;
-    if (!confirm(`Are you sure you want to delete the transaction for ${label}?`)) return;
+    if (!confirm(`Delete the transaction for ${label}? This can't be undone.`)) return;
     try {
       const res = await fetch(`${API_BASE}/finances/${txId}`, {
         method: 'DELETE'
@@ -73,7 +73,7 @@ function FinancesTab({
   };
 
   const deleteAccount = async (accountId, accountName) => {
-    if (!confirm(`Are you sure you want to delete "${accountName}"? All linked transactions will have their account unlinked, and linked recurring transactions will be deleted.`)) return;
+    if (!confirm(`Delete "${accountName}"? Linked transactions will lose their account, and linked recurring transactions will be deleted. This can't be undone.`)) return;
     try {
       const res = await fetch(`${API_BASE}/accounts/${accountId}`, {
         method: 'DELETE'
@@ -100,7 +100,7 @@ function FinancesTab({
   };
 
   const deleteRecurring = async (id) => {
-    if (!confirm("Are you sure you want to stop tracking this recurring transaction?")) return;
+    if (!confirm("Stop tracking this recurring transaction? This can't be undone.")) return;
     try {
       const res = await fetch(`${API_BASE}/recurring/${id}`, { method: 'DELETE' }).then(r => r.json());
       if (res.status === 'success') {
@@ -113,7 +113,7 @@ function FinancesTab({
   };
 
   const deleteStudentLoan = async (loanId, loanName) => {
-    if (!confirm(`Are you sure you want to delete "${loanName}"?`)) return;
+    if (!confirm(`Delete "${loanName}"? This can't be undone.`)) return;
     try {
       const res = await fetch(`${API_BASE}/student-loans/${loanId}`, {
         method: 'DELETE'
@@ -163,7 +163,7 @@ function FinancesTab({
         setEditingLoanId(null);
         fetchAllData();
       } else {
-        showToast("Error: " + (res.detail || "Failed to save loan"), "error");
+        showToast(res.detail || "Couldn't save the loan. Try again.", "error");
       }
     } catch (err) {
       showToast("Error saving student loan: " + err, "error");
@@ -176,15 +176,15 @@ function FinancesTab({
     <div>
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 className="page-title text-gradient-pink glitch-text">Finances</h1>
-          <p className="page-subtitle">Tracking: Liquid Assets & Inflow/Outflow</p>
+          <h1 className="page-title">Finances</h1>
+          <p className="page-subtitle">Accounts, budgets and spending</p>
         </div>
         <button 
           className="btn-primary" 
           onClick={() => setShowManagePanel(prev => !prev)}
-          style={{ fontSize: '0.75rem' }}
+          style={{ fontSize: 'var(--text-xs)' }}
         >
-          ⚙️ {showManagePanel ? "Close Configuration" : "Uplink Configuration"}
+          {showManagePanel ? "Close connections" : "Connections"}
         </button>
       </header>
 
@@ -193,11 +193,11 @@ function FinancesTab({
 
       {/* Overall Wealth Section */}
       <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', border: '1px solid var(--accent-cyan)' }}>
-        <span className="stat-label" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>NET WEALTH AUTHORITY</span>
-        <span className="stat-value" style={{ fontSize: 'clamp(1.8rem, 6vw, 3rem)', color: financesData.net_wealth >= 0 ? 'var(--accent-green)' : 'var(--accent-pink)', textShadow: financesData.net_wealth >= 0 ? '0 0 15px rgba(57, 255, 20, 0.3)' : '0 0 15px rgba(255, 0, 127, 0.3)', fontFamily: 'var(--font-mono)' }}>
+        <span className="stat-label" style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Net worth</span>
+        <span className="stat-value" style={{ fontSize: 'clamp(1.8rem, 6vw, 3rem)', color: financesData.net_wealth >= 0 ? 'var(--accent-green)' : 'var(--accent-pink)', textShadow: financesData.net_wealth >= 0 ? '0 0 15px rgba(57, 255, 20, 0.3)' : '0 0 15px color-mix(in srgb, var(--color-danger) 30%, transparent)', }}>
           ${financesData.net_wealth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>AGGREGATED TELEMETRY ACROSS ALL ACCOUNTS</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Across all accounts</span>
       </div>
 
       {/* Account Slider/Grid */}
@@ -205,12 +205,12 @@ function FinancesTab({
         {financesData.accounts.map(acc => {
           const isLiability = acc.type === 'credit_card';
           return (
-            <div key={acc.id} className="glass-panel" style={{ padding: '1rem 1.25rem', border: isLiability ? '1px solid rgba(255, 0, 127, 0.3)' : '1px solid rgba(0, 242, 254, 0.3)', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: 0, right: 0, background: isLiability ? 'var(--accent-pink)' : 'var(--accent-cyan)', color: 'var(--bg-space)', fontSize: '0.75rem', padding: '0.1rem 0.35rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+            <div key={acc.id} className="glass-panel" style={{ padding: '1rem 1.25rem', border: isLiability ? '1px solid color-mix(in srgb, var(--color-danger) 30%, transparent)' : '1px solid rgba(0, 242, 254, 0.3)', position: 'relative' }}>
+              <span style={{ position: 'absolute', top: 0, right: 0, background: isLiability ? 'var(--accent-pink)' : 'var(--accent-cyan)', color: 'var(--bg-space)', fontSize: 'var(--text-xs)', padding: '0.1rem 0.35rem', fontWeight: 'bold', }}>
                 {acc.type.toUpperCase()}
               </span>
-              <span className="stat-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>{acc.name}</span>
-              <span className="stat-value" style={{ fontSize: '1.3rem', color: 'var(--text-primary)' }}>
+              <span className="stat-label" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>{acc.name}</span>
+              <span className="stat-value" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-primary)' }}>
                 ${acc.current_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {showManagePanel && (
@@ -234,7 +234,7 @@ function FinancesTab({
                   }}
                   title={`Delete ${acc.name}`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }} aria-hidden="true">delete</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 'var(--text-md)' }} aria-hidden="true">delete</span>
                 </button>
               )}
             </div>
@@ -248,7 +248,7 @@ function FinancesTab({
           {/* Panel 1: Add Account */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <div className="panel-header" style={{ padding: '0 0 1rem 0', marginBottom: '1rem' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>Register Account</h3>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Register Account</h3>
             </div>
             <form onSubmit={(e) => {
               e.preventDefault();
@@ -284,20 +284,20 @@ function FinancesTab({
           {/* Panel 2: Static Budget (edit backend/config/budget.json) */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <div className="panel-header" style={{ padding: '0 0 1rem 0', marginBottom: '1rem' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>Monthly Budget</h3>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>Monthly Budget</h3>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {financesData.budgets.map(b => (
-                <div key={b.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                <div key={b.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                   <span style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{b.category}</span>
-                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>${Number(b.limit_amount).toFixed(0)}</span>
+                  <span style={{ color: 'var(--text-secondary)', }}>${Number(b.limit_amount).toFixed(0)}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', fontWeight: 600, borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.5rem' }}>
                 <span>Total</span>
-                <span style={{ fontFamily: 'var(--font-mono)' }}>${financesData.budgets.reduce((sum, b) => sum + Number(b.limit_amount || 0), 0).toFixed(0)}</span>
+                <span style={{ }}>${financesData.budgets.reduce((sum, b) => sum + Number(b.limit_amount || 0), 0).toFixed(0)}</span>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0.5rem 0 0 0' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', margin: '0.5rem 0 0 0' }}>
                 Static budget. Edit backend/config/budget.json to change.
               </p>
             </div>
@@ -306,7 +306,7 @@ function FinancesTab({
           {/* Panel 3: Add Recurring */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <div className="panel-header" style={{ padding: '0 0 1rem 0', marginBottom: '1rem' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>New Recurring Payment</h3>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>New Recurring Payment</h3>
             </div>
             <form onSubmit={(e) => {
               e.preventDefault();
@@ -374,7 +374,7 @@ function FinancesTab({
           {/* Panel 4: Manage Student Loans */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
             <div className="panel-header" style={{ padding: '0 0 1rem 0', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h3 className="panel-title" style={{ fontSize: '0.85rem' }}>
+              <h3 className="panel-title" style={{ fontSize: 'var(--text-sm)' }}>
                 {editingLoanId ? "Edit Student Loan" : "Register Student Loan"}
               </h3>
               {editingLoanId && (
@@ -385,7 +385,7 @@ function FinancesTab({
                     setEditingLoanId(null);
                     setLoanForm({ name: '', type: 'subsidized', balance: '', interest_rate: '', interest_accumulated: '' });
                   }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', height: 'auto', border: '1px solid var(--accent-pink)', color: 'var(--accent-pink)' }}
+                  style={{ fontSize: 'var(--text-xs)', padding: '0.25rem 0.5rem', height: 'auto', border: '1px solid var(--accent-pink)', color: 'var(--accent-pink)' }}
                 >
                   Cancel
                 </button>
@@ -469,7 +469,7 @@ function FinancesTab({
               className="form-select" 
               value={filterAccount} 
               onChange={e => setFilterAccount(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+              style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-xs)' }}
             >
               <option value="">All Accounts</option>
               {financesData.accounts.map(acc => (
@@ -483,7 +483,7 @@ function FinancesTab({
               className="form-select" 
               value={filterDateRange} 
               onChange={e => setFilterDateRange(e.target.value)}
-              style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+              style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-xs)' }}
             >
               <option value="all">All Time</option>
               <option value="this_month">This Month</option>
@@ -492,8 +492,8 @@ function FinancesTab({
             </select>
           </div>
         </div>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-          DIAGNOSTICS: FOUND {financesData.transactions.length} LOGGED ITEMS
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', }}>
+          {financesData.transactions.length} transactions logged
         </span>
       </div>
 
@@ -514,28 +514,28 @@ function FinancesTab({
                   {financesData.transactions.map((tx) => (
                     <div key={tx.id} className="list-item" style={{ padding: '0.6rem 0.8rem' }}>
                       <div className="item-meta">
-                        <span className="item-title" style={{ fontSize: '0.85rem' }}>{tx.merchant || "Unknown"}</span>
-                        <span className="item-subtitle" style={{ fontSize: '0.75rem' }}>
+                        <span className="item-title" style={{ fontSize: 'var(--text-sm)' }}>{tx.merchant || "Unknown"}</span>
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>
                           {tx.date} • {tx.category}
                         </span>
                         <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', alignItems: 'center' }}>
-                          <span className="badge tx-account-badge" style={{ fontSize: '0.75rem', padding: '0.05rem 0.3rem', background: 'rgba(0, 242, 254, 0.05)', borderColor: 'var(--border-cyan)' }}>
+                          <span className="badge tx-account-badge" style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.3rem', background: 'rgba(0, 242, 254, 0.05)', borderColor: 'var(--border-cyan)' }}>
                             {tx.account_name?.toUpperCase() || 'UNASSIGNED'}
                           </span>
-                          {tx.description && <span className="tx-desc-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{tx.description}</span>}
+                          {tx.description && <span className="tx-desc-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{tx.description}</span>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span className={`badge badge-${tx.type}`} style={{ fontSize: '0.75rem', padding: '0.1rem 0.3rem' }}>
+                        <span className={`badge badge-${tx.type}`} style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.3rem' }}>
                           {tx.type.toUpperCase()}
                         </span>
-                        <span className="item-value" style={{ fontSize: '0.9rem', color: tx.type === 'expense' ? 'var(--color-danger)' : tx.type === 'transfer' ? 'var(--accent-yellow)' : 'var(--color-success)' }}>
+                        <span className="item-value" style={{ fontSize: 'var(--text-sm)', color: tx.type === 'expense' ? 'var(--color-danger)' : tx.type === 'transfer' ? 'var(--accent-yellow)' : 'var(--color-success)' }}>
                           ${tx.amount.toFixed(2)}
                         </span>
                         <button
                           className="btn-danger-icon"
                           onClick={() => deleteTransaction(tx.id, tx.merchant, tx.amount)}
-                          style={{ padding: '0.15rem 0.35rem', fontSize: '0.8rem', borderRadius: '4px', marginLeft: '0.2rem' }}
+                          style={{ padding: '0.15rem 0.35rem', fontSize: 'var(--text-xs)', borderRadius: '4px', marginLeft: '0.2rem' }}
                           title="Delete transaction"
                           aria-label={`Delete transaction${tx.merchant ? ` for ${tx.merchant}` : ''}`}
                         >
@@ -653,12 +653,12 @@ function FinancesTab({
             {/* Custom stacked telemetry bar chart */}
             {financesData.breakdown.length > 0 && (
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
-                <span className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.5rem', display: 'block' }}>Relative Spending Telemetry</span>
+                <span className="form-label" style={{ fontSize: 'var(--text-xs)', marginBottom: '0.5rem', display: 'block' }}>Spending by category</span>
                 <div style={{ display: 'flex', height: '1.5rem', borderRadius: '4px', overflow: 'hidden', background: 'var(--bg-card)' }}>
                   {financesData.breakdown.map((item, idx) => {
                     const totalExpense = financesData.breakdown.reduce((sum, b) => sum + b.total, 0);
                     const pct = totalExpense > 0 ? (item.total / totalExpense) * 100 : 0;
-                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', 'var(--accent-yellow)', 'var(--accent-green)', '#ff5722'];
+                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--text-secondary)', 'var(--accent-yellow)', 'var(--accent-green)', 'var(--text-muted)'];
                     return (
                       <div 
                         key={item.category} 
@@ -670,9 +670,9 @@ function FinancesTab({
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 0.8rem', marginTop: '0.75rem' }}>
                   {financesData.breakdown.map((item, idx) => {
-                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--accent-purple)', 'var(--accent-yellow)', 'var(--accent-green)', '#ff5722'];
+                    const colors = ['var(--accent-cyan)', 'var(--accent-pink)', 'var(--text-secondary)', 'var(--accent-yellow)', 'var(--accent-green)', 'var(--text-muted)'];
                     return (
-                      <div key={item.category} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
+                      <div key={item.category} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: 'var(--text-xs)' }}>
                         <span style={{ width: '8px', height: '8px', background: colors[idx % colors.length], borderRadius: '2px' }} />
                         <span style={{ color: 'var(--text-secondary)' }}>{item.category}: ${item.total.toFixed(0)}</span>
                       </div>
@@ -684,10 +684,10 @@ function FinancesTab({
 
             {/* Budget Meters list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <span className="form-label" style={{ fontSize: '0.75rem', borderBottom: '1px dashed var(--border-cyan)', paddingBottom: '0.25rem' }}>Category Budget Meters</span>
+              <span className="form-label" style={{ fontSize: 'var(--text-xs)', borderBottom: '1px dashed var(--border-cyan)', paddingBottom: '0.25rem' }}>Category Budget Meters</span>
               
               {financesData.breakdown.length === 0 && financesData.budgets.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>No spending recorded for limits.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: '1rem 0' }}>No spending recorded for limits.</p>
               ) : (
                 [
                   ...financesData.budgets.map(b => ({ category: b.category, total: (financesData.breakdown.find(x => x.category === b.category) || {}).total || 0 })),
@@ -700,9 +700,9 @@ function FinancesTab({
                   
                   return (
                     <div key={item.category} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
                         <span style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{item.category}</span>
-                        <span style={{ color: isOver ? 'var(--accent-pink)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ color: isOver ? 'var(--accent-pink)' : 'var(--text-secondary)', }}>
                           ${item.total.toFixed(2)} {limit > 0 ? `/ $${limit.toFixed(0)}` : '(No limit)'}
                         </span>
                       </div>
@@ -713,7 +713,6 @@ function FinancesTab({
                               width: `${Math.min(pct, 100)}%`, 
                               height: '100%', 
                               background: isOver ? 'var(--accent-pink)' : 'var(--accent-cyan)',
-                              boxShadow: isOver ? '0 0 10px rgba(255, 0, 127, 0.5)' : 'none',
                               animation: isOver ? 'pulse 1.5s infinite' : 'none'
                             }} 
                           />
@@ -722,9 +721,9 @@ function FinancesTab({
                         )}
                       </div>
                       {limit > 0 && (
-                        <div className="budget-meta-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: isOver ? 'var(--accent-pink)' : 'var(--text-muted)' }}>
+                        <div className="budget-meta-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: isOver ? 'var(--accent-pink)' : 'var(--text-muted)' }}>
                           <span>{pct.toFixed(0)}% Consumed</span>
-                          <span>{isOver ? "⚠️ LIMIT EXCEEDED" : `$${(limit - item.total).toFixed(2)} Remaining`}</span>
+                          <span>{isOver ? "Over limit" : `$${(limit - item.total).toFixed(2)} Remaining`}</span>
                         </div>
                       )}
                     </div>
@@ -744,8 +743,8 @@ function FinancesTab({
             {financesData.recurring.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', padding: '4rem 0' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '32px', marginBottom: '0.5rem' }} aria-hidden="true">credit_card_off</span>
-                <p style={{ fontSize: '0.85rem' }}>No recurring items logged.</p>
-                <button className="btn-secondary" style={{ marginTop: '0.75rem', fontSize: '0.75rem' }} onClick={() => setShowManagePanel(true)}>Configure templates</button>
+                <p style={{ fontSize: 'var(--text-sm)' }}>No recurring items logged.</p>
+                <button className="btn-secondary" style={{ marginTop: '0.75rem', fontSize: 'var(--text-xs)' }} onClick={() => setShowManagePanel(true)}>Configure templates</button>
               </div>
             ) : (
               <div className="item-list">
@@ -757,28 +756,28 @@ function FinancesTab({
                     <div key={rec.id} className="list-item" style={{ padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'stretch' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{rec.name}</span>
-                          <span className="recurring-details" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--text-primary)' }}>{rec.name}</span>
+                          <span className="recurring-details" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                             Category: {rec.category} • Interval: {rec.interval}
                           </span>
                         </div>
-                        <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-pink)' }}>
+                        <span style={{ fontSize: 'var(--text-md)', fontWeight: 'bold', color: 'var(--accent-pink)' }}>
                           ${rec.amount.toFixed(2)}
                         </span>
                       </div>
                       
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #222', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--surface-2)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span className="recurring-debit-info" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Debits: {rec.account_name || 'Capital One Checking'}</span>
-                          <span style={{ fontSize: '0.75rem', color: isOverdue ? 'var(--accent-pink)' : 'var(--accent-cyan)', fontWeight: 600 }}>
-                            📅 Due: {rec.next_due_date} {isOverdue && "(OVERDUE)"}
+                          <span className="recurring-debit-info" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Debits: {rec.account_name || 'Capital One Checking'}</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: isOverdue ? 'var(--accent-pink)' : 'var(--accent-cyan)', fontWeight: 600 }}>
+                            Due: {rec.next_due_date} {isOverdue && "(overdue)"}
                           </span>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button aria-label="Delete recurring template" 
                             className="btn-danger-icon" 
                             onClick={() => deleteRecurring(rec.id)}
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem', borderRadius: '4px' }}
+                            style={{ padding: '0.25rem 0.4rem', fontSize: 'var(--text-xs)', borderRadius: '4px' }}
                             title="Delete recurring template"
                           >
                             ×
@@ -786,7 +785,7 @@ function FinancesTab({
                           <button 
                             className="btn-primary" 
                             onClick={() => payRecurring(rec.id)}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', height: 'auto' }}
+                            style={{ fontSize: 'var(--text-xs)', padding: '0.25rem 0.5rem', height: 'auto' }}
                           >
                             Mark Paid
                           </button>
@@ -817,14 +816,14 @@ function FinancesTab({
               return (
                 <>
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-cyan)', padding: '1rem', borderRadius: 'var(--border-radius)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>AGGREGATED LIABILITY (EXCLUDED FROM NET WEALTH)</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', }}>Liabilities (not in net worth)</span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.2rem' }}>
-                      <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-pink)', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--accent-pink)', }}>
                         ${totalLiability.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Total Liability</span>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Total Liability</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.4rem', marginTop: '0.2rem', fontSize: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-cyan)', paddingTop: '0.4rem', marginTop: '0.2rem', fontSize: 'var(--text-xs)' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Principal: <strong style={{ color: 'var(--text-primary)' }}>${totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
                       <span style={{ color: 'var(--text-muted)' }}>Interest: <strong style={{ color: 'var(--text-primary)' }}>${totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
                     </div>
@@ -833,22 +832,22 @@ function FinancesTab({
                   {loans.length === 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', padding: '2rem 0' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '32px', marginBottom: '0.5rem' }} aria-hidden="true">school</span>
-                      <p style={{ fontSize: '0.85rem' }}>No student loans registered.</p>
-                      <button className="btn-secondary" style={{ marginTop: '0.75rem', fontSize: '0.75rem' }} onClick={() => setShowManagePanel(true)}>Configure loans</button>
+                      <p style={{ fontSize: 'var(--text-sm)' }}>No student loans registered.</p>
+                      <button className="btn-secondary" style={{ marginTop: '0.75rem', fontSize: 'var(--text-xs)' }} onClick={() => setShowManagePanel(true)}>Configure loans</button>
                     </div>
                   ) : (
                     <div className="item-list" style={{ overflowY: 'auto', maxHeight: '350px' }}>
                       {loans.map(loan => {
                         const loanTotal = loan.balance + loan.interest_accumulated;
                         return (
-                          <div key={loan.id} className="list-item" style={{ padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', border: '1px solid rgba(255, 0, 127, 0.15)', borderRadius: '4px', marginBottom: '0.5rem' }}>
+                          <div key={loan.id} className="list-item" style={{ padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', border: '1px solid color-mix(in srgb, var(--color-danger) 15%, transparent)', borderRadius: '4px', marginBottom: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{loan.name}</span>
-                              <span style={{ fontSize: '0.75rem', background: loan.type === 'subsidized' ? 'var(--accent-cyan)' : 'var(--accent-pink)', color: 'var(--bg-space)', padding: '0.1rem 0.3rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+                              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}>{loan.name}</span>
+                              <span style={{ fontSize: 'var(--text-xs)', background: loan.type === 'subsidized' ? 'var(--accent-cyan)' : 'var(--accent-pink)', color: 'var(--bg-space)', padding: '0.1rem 0.3rem', fontWeight: 'bold', }}>
                                 {loan.type.toUpperCase()}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                               <span style={{ color: 'var(--text-secondary)' }}>Interest Rate: {loan.interest_rate}%</span>
                               <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>
                                 Total: ${loanTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -859,7 +858,7 @@ function FinancesTab({
                                 <button
                                   className="btn-danger-icon"
                                   onClick={() => deleteStudentLoan(loan.id, loan.name)}
-                                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '2px' }}
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: 'var(--text-xs)', borderRadius: '2px' }}
                                   title="Delete loan"
                                 >
                                   Delete
@@ -877,7 +876,7 @@ function FinancesTab({
                                     });
                                     setShowManagePanel(true);
                                   }}
-                                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: 'var(--text-xs)', height: 'auto' }}
                                 >
                                   Edit
                                 </button>

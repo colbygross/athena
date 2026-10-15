@@ -9,7 +9,7 @@ const API_BASE = import.meta.env.VITE_API_URL || (
       : `${window.location.origin}/api`
 );
 
-function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
+function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas, showToast }) {
   const [localData, setLocalData] = useState(careerData || { applications: [], leads: [], profiles: [], stats: {} });
   const [activeSubTab, setActiveSubTab] = useState('leads'); // 'leads', 'outreach', 'profiles', 'tracker'
   
@@ -79,28 +79,28 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
       
       if (res.status === 'success') {
         setPastedUrl('');
-        alert(`Successfully ingested lead: ${res.title} at ${res.company}`);
+        showToast(`Added lead: ${res.title} at ${res.company}`, "success");
         await refreshData();
       } else {
-        alert("Failed to ingest URL: " + res.detail);
+        showToast("Couldn't add that link. " + (res.detail || "Check the URL and try again."), "error");
       }
-    } catch (err) {
-      alert("Error ingesting URL: " + err);
+    } catch {
+      showToast("Couldn't add that link. Check your connection and try again.", "error");
     } finally {
       setIngesting(false);
     }
   };
 
   const handleIgnoreLead = async (leadId) => {
-    if (!confirm("Ignore this job lead? It will be removed from your active queue.")) return;
+    if (!confirm("Ignore this lead? It will leave your queue.")) return;
     try {
       const res = await fetch(`${API_BASE}/career/leads/${leadId}/ignore`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'success') {
         setSelectedLead(null);
         await refreshData();
       }
-    } catch (err) {
-      alert("Error ignoring lead: " + err);
+    } catch {
+      showToast("Couldn't ignore that lead. Try again.", "error");
     }
   };
 
@@ -109,7 +109,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
     try {
       const res = await fetch(`${API_BASE}/career/leads/${leadId}/approve`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'success') {
-        alert("Application tailored successfully! Dual-anchor bullet points, custom cover letter, and recruiter outreach draft are ready in the Outreach Station.");
+        showToast("Application tailored. The cover letter and outreach draft are ready under Outreach.", "success");
         setSelectedLead(null);
         setActiveSubTab('outreach');
         await refreshData();
@@ -121,10 +121,10 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
           handleSelectApp(matched);
         }
       } else {
-        alert("Processing failed: " + res.detail);
+        showToast("Tailoring failed. " + (res.detail || "Try again."), "error");
       }
-    } catch (err) {
-      alert("Error processing lead: " + err);
+    } catch {
+      showToast("Tailoring failed. Try again.", "error");
     } finally {
       setProcessingLeadId(null);
     }
@@ -156,7 +156,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
       }).then(r => r.json());
       
       if (res.status === 'success') {
-        alert("Successfully saved tailored edits!");
+        showToast("Edits saved.", "success");
         await refreshData();
         const updatedApp = {
           ...selectedApp,
@@ -168,31 +168,31 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
         };
         setSelectedApp(updatedApp);
       } else {
-        alert("Failed to save edits: " + res.detail);
+        showToast("Couldn't save edits. " + (res.detail || "Try again."), "error");
       }
-    } catch (err) {
-      alert("Error saving edits: " + err);
+    } catch {
+      showToast("Couldn't save edits. Try again.", "error");
     } finally {
       setIsSavingAppEdits(false);
     }
   };
 
   const handleSendEmail = async (appId) => {
-    if (!confirm("Send cold outreach email now?")) return;
+    if (!confirm("Send this outreach email now?")) return;
     setSendingEmailId(appId);
     try {
       const res = await fetch(`${API_BASE}/career/applications/${appId}/send-email`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'success') {
-        alert(res.message);
+        showToast(res.message, "success");
         await refreshData();
         if (selectedApp && selectedApp.id === appId) {
           setSelectedApp(prev => ({ ...prev, outreach_status: 'sent' }));
         }
       } else {
-        alert("Email failed: " + res.detail);
+        showToast("Couldn't send the email. " + (res.detail || "Try again."), "error");
       }
-    } catch (err) {
-      alert("Error sending email: " + err);
+    } catch {
+      showToast("Couldn't send the email. Try again.", "error");
     } finally {
       setSendingEmailId(null);
     }
@@ -203,10 +203,10 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
     try {
       const res = await fetch(`${API_BASE}/career/scrape`, { method: 'POST' }).then(r => r.json());
       if (res.status === 'started') {
-        alert("API Discovery & Dual-Anchor Tailoring Engine launched in background! Fresh remote and New England leads will populate shortly.");
+        showToast("Discovery started. New leads will appear shortly.", "success");
       }
-    } catch (err) {
-      alert("Failed to start discovery pipeline: " + err);
+    } catch {
+      showToast("Couldn't start discovery. Try again.", "error");
     } finally {
       setScraping(false);
     }
@@ -223,29 +223,29 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
       
       if (res.status === 'success') {
         setProfileForm({ name: '', resume_path: '', keywords: '', locations: '', active: 1 });
-        alert("Search profile added successfully!");
+        showToast("Search profile added.", "success");
         await refreshData();
       }
-    } catch (err) {
-      alert("Error adding profile: " + err);
+    } catch {
+      showToast("Couldn't add the profile. Try again.", "error");
     }
   };
 
   const handleDeleteProfile = async (id) => {
-    if (!confirm("Are you sure you want to delete this search profile?")) return;
+    if (!confirm("Delete this search profile? This can't be undone.")) return;
     try {
       const res = await fetch(`${API_BASE}/career/profiles/${id}`, { method: 'DELETE' }).then(r => r.json());
       if (res.status === 'success') {
         await refreshData();
       }
-    } catch (err) {
-      alert("Error deleting profile: " + err);
+    } catch {
+      showToast("Couldn't delete the profile. Try again.", "error");
     }
   };
 
   const copyToClipboard = (text, message = "Copied to clipboard!") => {
     navigator.clipboard.writeText(text);
-    alert(message);
+    showToast(message, "success");
   };
 
   const stats = localData.stats || {};
@@ -255,69 +255,69 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
       <header className="page-header" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h1 className="page-title text-gradient-yellow glitch-text">Career Tracker</h1>
-            <p className="page-subtitle font-mono">Priority 1: Automated Income Acquisition</p>
+            <h1 className="page-title">Career</h1>
+            <p className="page-subtitle">Priority 1: Income</p>
           </div>
           <button 
             onClick={handleTriggerScrape} 
             disabled={scraping} 
             className="btn-primary" 
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', border: '1px solid var(--accent-cyan)', background: 'rgba(0,240,255,0.1)', color: 'var(--accent-cyan)' }}
+            style={{ fontSize: 'var(--text-sm)', padding: '0.5rem 1rem', border: '1px solid var(--accent-cyan)', background: 'var(--surface-2)', color: 'var(--accent-cyan)' }}
           >
-            {scraping ? "RUNNING DISCOVERY..." : "⚡ RUN DISCOVERY ENGINE NOW"}
+            {scraping ? "Running discovery…" : "Run discovery"}
           </button>
         </div>
       </header>
 
       {/* Metrics Banner */}
       <div className="grid-4col" style={{ marginBottom: '1.25rem', gap: '0.75rem' }}>
-        <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-cyan)' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>DISCOVERED LEADS</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: '1.4rem' }}>{localData.leads?.length || 0}</h3>
+        <div className="glass-panel" style={{ padding: '0.75rem', }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Leads found</span>
+          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: 'var(--text-lg)' }}>{localData.leads?.length || 0}</h3>
         </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-green)' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 1: US REMOTE</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: '1.4rem' }}>{stats.tier1_count || 0}</h3>
+        <div className="glass-panel" style={{ padding: '0.75rem', }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>US remote</span>
+          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: 'var(--text-lg)' }}>{stats.tier1_count || 0}</h3>
         </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TIER 2: NEW ENGLAND</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: '1.4rem' }}>{stats.tier2_count || 0}</h3>
+        <div className="glass-panel" style={{ padding: '0.75rem', }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>New England</span>
+          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: 'var(--text-lg)' }}>{stats.tier2_count || 0}</h3>
         </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', borderLeft: '3px solid var(--accent-purple)' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>TAILORED PACKETS</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-purple)', fontSize: '1.4rem' }}>{localData.applications?.length || 0}</h3>
+        <div className="glass-panel" style={{ padding: '0.75rem', }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Tailored applications</span>
+          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-lg)' }}>{localData.applications?.length || 0}</h3>
         </div>
       </div>
 
       {/* Sub-Navigation Tabs */}
       <div className="tab-navigation" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
         <button 
-          className={`tab-btn font-mono ${activeSubTab === 'leads' ? 'active' : ''}`}
+          className={`tab-btn ${activeSubTab === 'leads' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('leads')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'leads' ? 'rgba(0, 240, 255, 0.1)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'leads' ? '2px solid var(--accent-cyan)' : 'none', color: activeSubTab === 'leads' ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'leads' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'leads' ? '2px solid var(--accent-cyan)' : 'none', color: activeSubTab === 'leads' ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          🌐 READY_TO_APPLY_QUEUE ({localData.leads?.length || 0})
+          Ready to apply ({localData.leads?.length || 0})
         </button>
         <button 
-          className={`tab-btn font-mono ${activeSubTab === 'outreach' ? 'active' : ''}`}
+          className={`tab-btn ${activeSubTab === 'outreach' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('outreach')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'outreach' ? 'rgba(188, 19, 254, 0.1)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'outreach' ? '2px solid var(--accent-purple)' : 'none', color: activeSubTab === 'outreach' ? 'var(--accent-purple)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'outreach' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'outreach' ? '2px solid var(--text-secondary)' : 'none', color: activeSubTab === 'outreach' ? 'var(--text-secondary)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          ⚡ OUTREACH_STATION ({localData.applications?.length || 0})
+          Outreach ({localData.applications?.length || 0})
         </button>
         <button 
-          className={`tab-btn font-mono ${activeSubTab === 'profiles' ? 'active' : ''}`}
+          className={`tab-btn ${activeSubTab === 'profiles' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('profiles')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'profiles' ? 'rgba(255, 186, 0, 0.1)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'profiles' ? '2px solid var(--accent-yellow)' : 'none', color: activeSubTab === 'profiles' ? 'var(--accent-yellow)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'profiles' ? 'color-mix(in srgb, var(--color-warning) 10%, transparent)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'profiles' ? '2px solid var(--accent-yellow)' : 'none', color: activeSubTab === 'profiles' ? 'var(--accent-yellow)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          ⚙️ SEARCH_PROFILES
+          Search profiles
         </button>
         <button 
-          className={`tab-btn font-mono ${activeSubTab === 'tracker' ? 'active' : ''}`}
+          className={`tab-btn ${activeSubTab === 'tracker' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('tracker')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'tracker' ? 'rgba(0, 255, 150, 0.1)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'tracker' ? '2px solid var(--accent-green)' : 'none', color: activeSubTab === 'tracker' ? 'var(--accent-green)' : 'var(--text-muted)', cursor: 'pointer' }}
+          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'tracker' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'tracker' ? '2px solid var(--accent-green)' : 'none', color: activeSubTab === 'tracker' ? 'var(--accent-green)' : 'var(--text-muted)', cursor: 'pointer' }}
         >
-          📊 APPLICATION_LOGS
+          Applications
         </button>
       </div>
 
@@ -328,12 +328,12 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
           <div className="glass-panel">
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="panel-title">Target Job Opportunities</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>Sorted by Match Score</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Sorted by match score</span>
             </div>
             
             <div className="panel-content">
               {(!localData.leads || localData.leads.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>No active job leads in queue. Click 'RUN DISCOVERY ENGINE NOW' above to ingest fresh positions.</p>
+                <p style={{ color: 'var(--text-muted)', }}>No active job leads in queue. Click 'Run discovery' above to ingest fresh positions.</p>
               ) : (
                 <div className="item-list" style={{ maxHeight: '550px', overflowY: 'auto' }}>
                   {localData.leads.map((lead) => (
@@ -341,36 +341,36 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       key={lead.id} 
                       className={`list-item ${selectedLead?.id === lead.id ? 'active' : ''}`}
                       onClick={() => setSelectedLead(lead)}
-                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', borderLeft: selectedLead?.id === lead.id ? '4px solid var(--accent-cyan)' : '1px solid var(--border-glass)', marginBottom: '0.5rem' }}
+                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', background: selectedLead?.id === lead.id ? 'var(--surface-2)' : undefined, marginBottom: '0.5rem' }}
                     >
                       <div className="item-meta">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span className="item-title" style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{lead.role}</span>
+                          <span className="item-title" style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>{lead.role}</span>
                           <span style={{ 
-                            fontSize: '0.75rem', 
+                            fontSize: 'var(--text-xs)', 
                             padding: '0.15rem 0.4rem', 
                             borderRadius: '3px', 
                             fontWeight: 'bold',
-                            background: (lead.match_score || 70) >= 80 ? 'rgba(0,255,150,0.15)' : 'rgba(255,186,0,0.15)',
+                            background: (lead.match_score || 70) >= 80 ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
                             color: (lead.match_score || 70) >= 80 ? 'var(--accent-green)' : 'var(--accent-yellow)',
                             border: (lead.match_score || 70) >= 80 ? '1px solid var(--accent-green)' : '1px solid var(--accent-yellow)'
                           }}>
                             Match: {lead.match_score || 75}%
                           </span>
                         </div>
-                        <span className="item-subtitle" style={{ fontSize: '0.85rem' }}>{lead.company} • <span style={{ fontStyle: 'italic' }}>{lead.location}</span></span>
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-sm)' }}>{lead.company} • <span style={{ fontStyle: 'italic' }}>{lead.location}</span></span>
                         
                         <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                           {lead.is_remote ? (
-                            <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.3rem', background: 'rgba(0,240,255,0.15)', color: 'var(--accent-cyan)', borderRadius: '3px', border: '1px solid var(--accent-cyan)' }}>
-                              TIER 1: US REMOTE
+                            <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.3rem', background: 'var(--surface-2)', color: 'var(--accent-cyan)', borderRadius: '3px', border: '1px solid var(--accent-cyan)' }}>
+                              US remote
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.3rem', background: 'rgba(188,19,254,0.15)', color: 'var(--accent-purple)', borderRadius: '3px', border: '1px solid var(--accent-purple)' }}>
-                              TIER 2: NEW ENGLAND REGIONAL
+                            <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.3rem', background: 'var(--surface-2)', color: 'var(--text-secondary)', borderRadius: '3px', border: '1px solid var(--text-secondary)' }}>
+                              New England regional
                             </span>
                           )}
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                             Source: {lead.source.toUpperCase()}
                           </span>
                         </div>
@@ -390,13 +390,13 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                 <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h3 className="panel-title">{selectedLead.role}</h3>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{selectedLead.company}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{selectedLead.company}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
                       onClick={() => handleIgnoreLead(selectedLead.id)} 
                       className="btn-danger" 
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--text-xs)' }}
                     >
                       Ignore
                     </button>
@@ -404,22 +404,22 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       onClick={() => handleProcessLead(selectedLead.id)} 
                       disabled={processingLeadId !== null}
                       className="btn-primary" 
-                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 'bold' }}
+                      style={{ padding: '0.3rem 0.75rem', fontSize: 'var(--text-xs)', fontWeight: 'bold' }}
                     >
-                      {processingLeadId === selectedLead.id ? "TAILORING PACKET..." : "APPROVE & TAILOR (1-CLICK)"}
+                      {processingLeadId === selectedLead.id ? "Tailoring…" : "Approve and tailor"}
                     </button>
                   </div>
                 </div>
                 <div className="panel-content" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                  <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  <p style={{ fontSize: 'var(--text-sm)', marginBottom: '0.5rem' }}>
                     <strong>Location:</strong> {selectedLead.location} | <strong>Classification:</strong> {selectedLead.is_remote ? 'Tier 1 US Remote' : 'Tier 2 New England Regional'}
                   </p>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>
-                    🔗 <a href={selectedLead.job_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View Listing on Portal</a>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--accent-cyan)' }}>
+                    <a href={selectedLead.job_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View listing on portal</a>
                   </p>
                   <hr style={{ border: 'none', borderBottom: '1px solid var(--border-glass)', margin: '0.75rem 0' }} />
-                  <p style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Job Description:</p>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', marginBottom: '0.25rem' }}>Job Description:</p>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                     {selectedLead.job_description}
                   </pre>
                 </div>
@@ -491,13 +491,13 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       key={app.id} 
                       className={`list-item ${selectedApp?.id === app.id ? 'active' : ''}`}
                       onClick={() => handleSelectApp(app)}
-                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', borderLeft: selectedApp?.id === app.id ? '4px solid var(--accent-purple)' : '1px solid var(--border-glass)', marginBottom: '0.5rem' }}
+                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', background: selectedApp?.id === app.id ? 'var(--surface-2)' : undefined, marginBottom: '0.5rem' }}
                     >
                       <div className="item-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <div>
                           <span className="item-title" style={{ fontWeight: 'bold' }}>{app.role}</span>
                           <span className="item-subtitle">{app.company}</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
                             Recruiter: {app.recruiter_name || 'Hiring Team'} ({app.recruiter_email || 'No email'})
                           </span>
                         </div>
@@ -518,15 +518,15 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
               <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
                   <div>
-                    <h3 className="panel-title" style={{ color: 'var(--accent-purple)' }}>{selectedApp.role} @ {selectedApp.company}</h3>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Dual-Anchor Application Packet</span>
+                    <h3 className="panel-title" style={{ color: 'var(--text-secondary)' }}>{selectedApp.role} @ {selectedApp.company}</h3>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Dual-Anchor Application Packet</span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
                       onClick={handleSaveAppEdits} 
                       disabled={isSavingAppEdits}
                       className="btn-secondary" 
-                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem' }}
                     >
                       {isSavingAppEdits ? "Saving..." : "Save Edits"}
                     </button>
@@ -534,9 +534,9 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                       onClick={() => handleSendEmail(selectedApp.id)} 
                       disabled={sendingEmailId === selectedApp.id || selectedApp.outreach_status === 'sent'}
                       className="btn-primary" 
-                      style={{ background: selectedApp.outreach_status === 'sent' ? 'var(--bg-surface)' : 'var(--text-primary)', color: selectedApp.outreach_status === 'sent' ? 'var(--text-muted)' : 'var(--bg-primary, #ffffff) !important', border: selectedApp.outreach_status === 'sent' ? '1px solid var(--border-cyan)' : 'none', fontSize: '0.75rem', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}
+                      style={{ background: selectedApp.outreach_status === 'sent' ? 'var(--bg-surface)' : 'var(--text-primary)', color: selectedApp.outreach_status === 'sent' ? 'var(--text-muted)' : 'var(--bg-primary, #ffffff) !important', border: selectedApp.outreach_status === 'sent' ? '1px solid var(--border-cyan)' : 'none', fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}
                     >
-                      {sendingEmailId === selectedApp.id ? "Sending..." : selectedApp.outreach_status === 'sent' ? "Outreach Logged" : "SEND RECRUITER OUTREACH"}
+                      {sendingEmailId === selectedApp.id ? "Sending..." : selectedApp.outreach_status === 'sent' ? "Outreach Logged" : "Send outreach email"}
                     </button>
                   </div>
                 </div>
@@ -570,7 +570,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <button 
                       className="link-btn" 
                       onClick={() => copyToClipboard(editColdEmail, "Email draft copied!")} 
-                      style={{ fontSize: '0.75rem', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       Copy Draft
                     </button>
@@ -578,7 +578,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                   <textarea 
                     rows={6} 
                     className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
                     value={editColdEmail} 
                     onChange={e => setEditColdEmail(e.target.value)} 
                   />
@@ -591,7 +591,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <button 
                       className="link-btn" 
                       onClick={() => copyToClipboard(editBullets, "Tailored bullets copied!")} 
-                      style={{ fontSize: '0.75rem', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       Copy Bullets
                     </button>
@@ -599,7 +599,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                   <textarea 
                     rows={4} 
                     className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
                     value={editBullets} 
                     onChange={e => setEditBullets(e.target.value)} 
                   />
@@ -612,7 +612,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <button 
                       className="link-btn" 
                       onClick={() => copyToClipboard(editCoverLetter, "Cover letter copied!")} 
-                      style={{ fontSize: '0.75rem', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       Copy Cover Letter
                     </button>
@@ -620,7 +620,7 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                   <textarea 
                     rows={6} 
                     className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
                     value={editCoverLetter} 
                     onChange={e => setEditCoverLetter(e.target.value)} 
                   />
@@ -652,14 +652,14 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <div key={p.id} className="list-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', border: '1px solid var(--border-glass)', borderRadius: '4px', marginBottom: '0.5rem' }}>
                       <div className="item-meta">
                         <span className="item-title" style={{ fontWeight: 'bold' }}>{p.name}</span>
-                        <span className="item-subtitle" style={{ fontSize: '0.8rem' }}>Keywords: {p.keywords}</span>
-                        <span className="item-subtitle" style={{ fontSize: '0.8rem' }}>Locations: {p.locations}</span>
-                        {p.resume_path && <span className="item-subtitle" style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--accent-purple)' }}>Resume: {p.resume_path.split('/').pop()}</span>}
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>Keywords: {p.keywords}</span>
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>Locations: {p.locations}</span>
+                        {p.resume_path && <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)', fontFamily: 'inherit', color: 'var(--text-secondary)' }}>Resume: {p.resume_path.split('/').pop()}</span>}
                       </div>
                       <button 
                         onClick={() => handleDeleteProfile(p.id)} 
                         className="btn-primary" 
-                        style={{ background: 'rgba(255,0,0,0.1)', color: 'red', border: '1px solid red', padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                        style={{ background: 'color-mix(in srgb, var(--color-danger) 10%, transparent)', color: 'var(--color-danger)', border: 'none', padding: '0.2rem 0.5rem', fontSize: 'var(--text-xs)' }}
                       >
                         Delete
                       </button>
@@ -748,13 +748,13 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     <div key={app.id} className="list-item" style={{ padding: '0.75rem', border: '1px solid var(--border-glass)', borderRadius: '4px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="item-meta">
                         <span className="item-title" style={{ fontWeight: 'bold' }}>{app.role} at {app.company}</span>
-                        <span className="item-subtitle" style={{ fontSize: '0.8rem' }}>
+                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>
                           Applied: {app.date_applied} {app.salary_range ? `• Salary: ${app.salary_range}` : ''}
                         </span>
                         {app.notes && <span className="item-subtitle career-app-notes" style={{ fontStyle: 'italic', marginTop: '0.25rem', display: 'block' }}>"{app.notes}"</span>}
                         {app.job_description_url && (
-                          <span className="career-app-link" style={{ fontSize: '0.8rem', marginTop: '0.25rem', display: 'block' }}>
-                            🔗 <a href={app.job_description_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
+                          <span className="career-app-link" style={{ fontSize: 'var(--text-xs)', marginTop: '0.25rem', display: 'block' }}>
+                            <a href={app.job_description_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
                               Job Posting URL
                             </a>
                           </span>
@@ -793,8 +793,8 @@ function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas }) {
                     await handleFormSubmit('career', payload, () => {}, {});
                     form.reset();
                     await refreshData();
-                  } catch (err) {
-                    alert("Error logging manual application: " + err);
+                  } catch {
+                    showToast("Couldn't log the application. Try again.", "error");
                   }
                 }}>
                   <div className="form-grid">

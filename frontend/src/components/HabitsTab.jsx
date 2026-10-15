@@ -16,7 +16,7 @@ function HabitsTab({ habitsData, handleFormSubmit, renderRelatedAreas }) {
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title text-gradient-green glitch-text">Habit Streaks</h1>
+        <h1 className="page-title">Habits</h1>
         <p className="page-subtitle">Daily Routines: Repetition Sequence</p>
       </header>
 
