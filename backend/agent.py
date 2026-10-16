@@ -300,9 +300,19 @@ def _ollama_generate(prompt, image_data=None, model=None):
             time.sleep(sleep_time)
 
 
+class InboxAnalysisError(Exception):
+    """LLM analysis of an inbox file failed. retryable=True when Ollama itself was unreachable."""
+    def __init__(self, message, retryable):
+        super().__init__(message)
+        self.retryable = retryable
+
+# Inbox subfolder for files the LLM could not turn into valid JSON. Move a file back to retry it.
+INBOX_FAILED_DIRNAME = "Failed"
+
 def analyze_file(file_path):
     """
-    Call local Ollama LLM to analyze file content, or fall back to mock data.
+    Call local Ollama LLM to analyze file content (mock data only when LLM_ENABLED is false).
+    Raises InboxAnalysisError on failure; it never falls back to mock data, which would be saved as real records.
     """
     filename = os.path.basename(file_path)
     if not LLM_ENABLED:
@@ -352,10 +362,15 @@ def analyze_file(file_path):
             if resp_text.startswith("json"):
                 resp_text = resp_text[4:].strip()
 
-        return json.loads(resp_text)
+        analysis = json.loads(resp_text)
+        if not isinstance(analysis, dict):
+            raise ValueError("LLM response is not a JSON object")
+        return analysis
+    except RuntimeError as e:
+        # _ollama_generate exhausted its retries: Ollama is down, so the file may succeed later.
+        raise InboxAnalysisError(f"Ollama unavailable: {e}", retryable=True) from e
     except Exception as e:
-        print(f"Error during LLM analysis of {filename}: {e}. Falling back to mock data.")
-        return get_mock_analysis(filename, file_path)
+        raise InboxAnalysisError(f"Could not analyze {filename}: {e}", retryable=False) from e
 
 def resolve_account_id(cursor, struct=None, merchant=None, desc=None):
     """
@@ -664,7 +679,14 @@ def save_data_to_db(analysis_results, relative_moved_path):
             )
         elif category == "health" and struct:
             cursor.execute(
-                "INSERT OR REPLACE INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                """INSERT INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes) VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(date) DO UPDATE SET
+                   weight_lbs = COALESCE(excluded.weight_lbs, weight_lbs),
+                   sleep_hours = COALESCE(excluded.sleep_hours, sleep_hours),
+                   mood = COALESCE(excluded.mood, mood),
+                   systolic = COALESCE(excluded.systolic, systolic),
+                   diastolic = COALESCE(excluded.diastolic, diastolic),
+                   notes = COALESCE(excluded.notes, notes)""",
                 (
                     struct.get("date") or current_date_str,
                     struct.get("weight_lbs"),
@@ -898,6 +920,16 @@ def generate_obsidian_summaries():
     conn.close()
     print("Regenerated Obsidian Vault index summaries.")
 
+def safe_basename(candidate, fallback):
+    """
+    Reduce an untrusted (LLM-suggested) filename to a bare basename so it can
+    never escape the destination directory. Falls back to the original name.
+    """
+    name = os.path.basename(str(candidate or "").replace("\\", "/")).strip()
+    if not name or name in (".", "..") or name.startswith("."):
+        name = os.path.basename(fallback)
+    return name
+
 def process_inbox():
     """
     Main loop to scan and process the inbox folder.
@@ -924,12 +956,26 @@ def process_inbox():
         print(f"\nProcessing: {filename}")
         
         # 1. Ask LLM to analyze the file
-        analysis = analyze_file(file_path)
+        try:
+            analysis = analyze_file(file_path)
+        except InboxAnalysisError as e:
+            if e.retryable:
+                print(f"{e}. Leaving {filename} in inbox for the next run.")
+            else:
+                failed_dir = os.path.join(INBOX_DIR, INBOX_FAILED_DIRNAME)
+                os.makedirs(failed_dir, exist_ok=True)
+                failed_path = os.path.join(failed_dir, filename)
+                if os.path.exists(failed_path):
+                    base, ext = os.path.splitext(filename)
+                    failed_path = os.path.join(failed_dir, f"{base}_{int(datetime.now().timestamp())}{ext}")
+                shutil.move(file_path, failed_path)
+                print(f"{e}. Moved to {failed_path}; move it back to the inbox to retry.")
+            continue
         analysis["original_name"] = filename
         
         category = analysis.get("category", "general")
         sub_folder = CATEGORIES.get(category, "03_Resources")
-        recommended_name = analysis.get("recommended_filename") or filename
+        recommended_name = safe_basename(analysis.get("recommended_filename"), filename)
         
         is_md = filename.lower().endswith('.md')
         
@@ -1085,51 +1131,22 @@ def sync_db_to_tasks_md_helper():
         "This file is synced automatically with your Athena OS Dashboard.\n"
     ]
     
-    for cat in ["finances", "health", "fitness", "learning", "career", "general"]:
-        tasks_in_cat = categories_tasks.get(cat, [])
-        if not tasks_in_cat:
-            continue
-            
+    # Known categories first in a fixed order, then any custom ones in first-seen order.
+    known_order = ["finances", "health", "fitness", "learning", "career", "general"]
+    ordered_cats = [c for c in known_order if c in categories_tasks]
+    ordered_cats += [c for c in categories_tasks if c not in known_order]
+
+    for cat in ordered_cats:
         content.append(f"\n## {cat.capitalize()}")
-        for t in tasks_in_cat:
+        for t in categories_tasks[cat]:
             checkbox = "- [ ]" if t['status'] == 'pending' else "- [x]"
             tags = []
             importance = t['importance'] or 'minor'
             priority = t['priority'] or 'medium'
-            if importance == 'major':
-                tags.append('#major')
-            elif importance == 'minor':
-                tags.append('#minor')
-            if priority == 'high':
-                tags.append('#high')
-            elif priority == 'medium':
-                tags.append('#medium')
-            elif priority == 'low':
-                tags.append('#low')
-            tag_str = " " + " ".join(tags) if tags else ""
-            due_str = f" 📅 {t['due_date']}" if t['due_date'] else ""
-            content.append(f"{checkbox} {t['title']}{tag_str}{due_str}")
-            
-    # Remaining categories
-    for cat, tasks_in_cat in categories_tasks.items():
-        if cat in ["finances", "health", "fitness", "learning", "career", "general"]:
-            continue
-        content.append(f"\n## {cat.capitalize()}")
-        for t in tasks_in_cat:
-            checkbox = "- [ ]" if t['status'] == 'pending' else "- [x]"
-            tags = []
-            importance = t['importance'] or 'minor'
-            priority = t['priority'] or 'medium'
-            if importance == 'major':
-                tags.append('#major')
-            elif importance == 'minor':
-                tags.append('#minor')
-            if priority == 'high':
-                tags.append('#high')
-            elif priority == 'medium':
-                tags.append('#medium')
-            elif priority == 'low':
-                tags.append('#low')
+            if importance in ('major', 'minor'):
+                tags.append(f"#{importance}")
+            if priority in ('high', 'medium', 'low'):
+                tags.append(f"#{priority}")
             tag_str = " " + " ".join(tags) if tags else ""
             due_str = f" 📅 {t['due_date']}" if t['due_date'] else ""
             content.append(f"{checkbox} {t['title']}{tag_str}{due_str}")
@@ -1187,9 +1204,13 @@ def serialize_local_events_to_ics_helper():
         print(f"Error writing to calendar.ics: {e}")
 
 def parse_local_ics():
+    """
+    Return the VEVENTs in calendar.ics, or None if the file is missing or unreadable.
+    None means "unknown", so callers must not treat it as "no events".
+    """
     ics_path = os.path.join(VAULT_DIR, "calendar.ics")
     if not os.path.exists(ics_path):
-        return []
+        return None
         
     events = []
     try:
@@ -1225,17 +1246,28 @@ def parse_local_ics():
                 })
     except Exception as e:
         print(f"Error parsing local ICS: {e}")
+        return None
         
     return events
 
 def sync_local_ics_to_db():
     local_events = parse_local_ics()
+    if local_events is None:
+        # Missing or unparseable file: skip the sync rather than deleting every local event.
+        return
+    ics_path = os.path.join(VAULT_DIR, "calendar.ics")
+    # created_at is UTC (CURRENT_TIMESTAMP); events created after the file was last written
+    # are not in it yet, so they must not be treated as removed.
+    ics_written_at = datetime.utcfromtimestamp(os.path.getmtime(ics_path)).strftime("%Y-%m-%d %H:%M:%S")
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT event_uid FROM calendar_events WHERE source = 'local_ics'")
+        cursor.execute(
+            "SELECT event_uid FROM calendar_events WHERE source = 'local_ics' AND (created_at IS NULL OR created_at < ?)",
+            (ics_written_at,)
+        )
         existing_uids = set([row['event_uid'] for row in cursor.fetchall()])
         
         parsed_uids = set([ev['event_uid'] for ev in local_events])
@@ -1533,6 +1565,10 @@ def push_pending_events():
         raise
     finally:
         conn.close()
+    if pushed_uids:
+        # Pushed rows are no longer local_ics; rewrite calendar.ics so their old '@local'
+        # UIDs are not re-imported as duplicates by the next sync_local_ics_to_db.
+        serialize_local_events_to_ics_helper()
     return pushed_uids
 
 def sync_google_calendar_to_db():
@@ -2282,29 +2318,17 @@ def cleanup_old_completed_tasks(days=3):
         tasks_by_file = {}
         for task in old_tasks:
             src_file = task['source_file']
-            if src_file:
-                if src_file not in tasks_by_file:
-                    tasks_by_file[src_file] = []
-                tasks_by_file[src_file].append(task['title'])
-            else:
-                # Task has no source file (created in DB directly), just delete from DB
-                cursor.execute("DELETE FROM tasks WHERE id = ?", (task['id'],))
-                
-        # Regex and patterns for task matching
-        task_pattern = re.compile(r'^\s*-\s*\[([xX])\]\s*(.+)$')
-        due_date_pattern = re.compile(r'📅\s*(\d{4}-\d{2}-\d{2})')
-        importance_pattern = re.compile(r'#major\b|#minor\b', re.IGNORECASE)
-        priority_pattern = re.compile(r'#high\b|#p1\b|#medium\b|#p2\b|#low\b|#p3\b', re.IGNORECASE)
-
-        for src_file, titles in tasks_by_file.items():
             if not src_file or src_file == "tasks.md":
-                # Clean up from DB (since they don't reside in human-authored files)
-                for title in titles:
-                    cursor.execute("DELETE FROM tasks WHERE (source_file IS NULL OR source_file = '' OR source_file = 'tasks.md') AND title = ?", (title,))
+                # DB-only / tasks.md task: delete exactly this completed row
+                cursor.execute("DELETE FROM tasks WHERE id = ?", (task['id'],))
             else:
-                # For human-authored files, we preserve completed tasks to keep history
-                # of both note content and database telemetry records.
-                print(f"Preserving completed task in human-authored file: {src_file}")
+                tasks_by_file.setdefault(src_file, []).append(task['title'])
+
+
+        for src_file in tasks_by_file:
+            # For human-authored files, we preserve completed tasks to keep history
+            # of both note content and database telemetry records.
+            print(f"Preserving completed task in human-authored file: {src_file}")
                 
         conn.commit()
     except Exception as e:
