@@ -34,9 +34,14 @@ main() {
     fi
 
     echo "[3/4] Building image and starting athena-prod..."
+    docker compose build
+    # The app runs as archer (uid 1000); make sure nothing in the data dirs is left root-owned
+    # or unreadable (older containers ran as root and wrote 0600 files).
+    docker compose run --rm --no-deps --user root --entrypoint sh athena -c \
+        "chown -R 1000:1000 /app/obsidian_vault /app/storage && find /app/obsidian_vault -type f -perm 600 -exec chmod 644 {} +"
     # --remove-orphans also removes any container left in the 'athena' project that
     # docker-compose.yml doesn't define (e.g. the old dev stack).
-    docker compose up -d --build --remove-orphans
+    docker compose up -d --remove-orphans
 
     echo "[4/4] Waiting for Athena to respond..."
     for _ in $(seq 1 45); do

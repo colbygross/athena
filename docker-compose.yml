@@ -7,8 +7,11 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # Run as archer so vault and storage files stay owned by (and editable for) archer and Obsidian.
+    user: "1000:1000"
+    # Host networking: the app listens on archer's :8000 directly and reaches Ollama,
+    # which only listens on archer's 127.0.0.1:11434.
+    network_mode: host
     # Code and the frontend bundle come only from the image built by scripts/deploy.sh.
     # Only data is mounted: the vault and storage/ (which holds the database).
     volumes:
@@ -20,8 +23,9 @@ services:
       - DB_PATH=/app/storage/life_dashboard.db
       - WORKSPACE_DIR=/app
       - PYTHONUNBUFFERED=1
+      - HOME=/tmp
       - LLM_ENABLED=${LLM_ENABLED:-false}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-phi4-mini:latest}
+      - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-qwen3-vl:2b}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"

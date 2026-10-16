@@ -42,6 +42,8 @@ def write_file_atomically(file_path, content, mode='w', encoding='utf-8'):
         temp_file.write(content)
         temp_path = temp_file.name
     try:
+        # NamedTemporaryFile creates 0600 files; vault notes must stay readable by Obsidian.
+        os.chmod(temp_path, 0o644)
         os.replace(temp_path, file_path)
     except Exception:
         if os.path.exists(temp_path):
