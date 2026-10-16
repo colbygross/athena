@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { activateOnKey } from '../a11y';
+import { useState, useCallback } from 'react';
+import { activateOnKey, useDialog } from '../a11y';
 
 const API_BASE = import.meta.env.VITE_API_URL || (
   window.location.port === '5174'
@@ -9,838 +9,626 @@ const API_BASE = import.meta.env.VITE_API_URL || (
       : `${window.location.origin}/api`
 );
 
-function CareerTab({ careerData, handleFormSubmit, renderRelatedAreas, showToast }) {
-  const [localData, setLocalData] = useState(careerData || { applications: [], leads: [], profiles: [], stats: {} });
-  const [activeSubTab, setActiveSubTab] = useState('leads'); // 'leads', 'outreach', 'profiles', 'tracker'
-  
-  // URL Ingest state
-  const [pastedUrl, setPastedUrl] = useState('');
-  const [ingestProfileId, setIngestProfileId] = useState('');
-  const [ingesting, setIngesting] = useState(false);
-  
-  // Profile creation state
-  const [profileForm, setProfileForm] = useState({
-    name: '',
-    resume_path: '',
-    keywords: '',
-    locations: '',
-    active: 1
+const STATUSES = [
+  { id: 'applied', label: 'Applied' },
+  { id: 'interviewing', label: 'Interviewing' },
+  { id: 'offered', label: 'Offered' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'withdrawn', label: 'Withdrawn' },
+];
+const STATUS_LABEL = Object.fromEntries(STATUSES.map(s => [s.id, s.label]));
+
+const EVENT_KINDS = [
+  { id: 'interview', label: 'Interview' },
+  { id: 'recruiter_contact', label: 'Recruiter contact' },
+  { id: 'offer', label: 'Offer' },
+  { id: 'note', label: 'Note' },
+];
+const EVENT_LABEL = { status_change: 'Status change', ...Object.fromEntries(EVENT_KINDS.map(k => [k.id, k.label])) };
+
+const APP_FIELDS = ['company', 'role', 'date_applied', 'salary_range', 'job_description_url', 'notes', 'recruiter_name', 'recruiter_email'];
+const EMPTY_LEAD = { company: '', role: '', job_url: '', location: '', salary_range: '' };
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+const formatDate = (value) => {
+  if (!value) return '';
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// fetch + JSON with the backend's {detail} error text surfaced
+const request = async (path, method = 'GET', body) => {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
   });
-  
-  // Scraping state
-  const [scraping, setScraping] = useState(false);
-  
-  // Detail selection states
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [selectedApp, setSelectedApp] = useState(null);
-  const [processingLeadId, setProcessingLeadId] = useState(null);
-  const [sendingEmailId, setSendingEmailId] = useState(null);
-  
-  // Local edit states for outreach station
-  const [editRecruiterName, setEditRecruiterName] = useState('');
-  const [editRecruiterEmail, setEditRecruiterEmail] = useState('');
-  const [editColdEmail, setEditColdEmail] = useState('');
-  const [editBullets, setEditBullets] = useState('');
-  const [editCoverLetter, setEditCoverLetter] = useState('');
-  const [isSavingAppEdits, setIsSavingAppEdits] = useState(false);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Request failed');
+  return data;
+};
 
-  // Sync props to local state
-  useEffect(() => {
-    if (careerData) {
-      setLocalData(careerData);
-      if (careerData.profiles && careerData.profiles.length > 0 && !ingestProfileId) {
-        setIngestProfileId(String(careerData.profiles[0].id));
-      }
-    }
-  }, [careerData]);
+function ApplicationCard({ app, onOpen, onDragStart, onDragEnd }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      draggable
+      className="career-card"
+      onClick={() => onOpen(app.id)}
+      onKeyDown={activateOnKey}
+      onDragStart={e => { e.dataTransfer.setData('text/plain', String(app.id)); e.dataTransfer.effectAllowed = 'move'; onDragStart(app.id); }}
+      onDragEnd={onDragEnd}
+      aria-label={`${app.role} at ${app.company}, ${STATUS_LABEL[app.status] || app.status}. Open details`}
+    >
+      <span className="career-card-role">{app.role}</span>
+      <span className="career-card-company">{app.company}</span>
+      <span className="career-card-meta">
+        <span className="career-figure">{formatDate(app.date_applied)}</span>
+        {app.salary_range && <span>{app.salary_range}</span>}
+        {app.created_by && <span>via {app.created_by}</span>}
+      </span>
+    </div>
+  );
+}
 
-  const refreshData = async () => {
+function PipelineBoard({ applications, onOpen, onMove }) {
+  const [dragId, setDragId] = useState(null);
+  const [overStatus, setOverStatus] = useState(null);
+
+  return (
+    <div className="career-board" role="list" aria-label="Application pipeline">
+      {STATUSES.map(({ id, label }) => {
+        const items = applications.filter(a => a.status === id);
+        return (
+          <section
+            key={id}
+            role="listitem"
+            aria-labelledby={`career-col-${id}`}
+            className={`career-column ${overStatus === id ? 'is-drop-target' : ''}`}
+            onDragOver={e => { if (dragId != null) { e.preventDefault(); setOverStatus(id); } }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOverStatus(null); }}
+            onDrop={e => {
+              e.preventDefault();
+              const appId = Number(e.dataTransfer.getData('text/plain'));
+              setOverStatus(null);
+              setDragId(null);
+              const app = applications.find(a => a.id === appId);
+              if (app && app.status !== id) onMove(appId, id);
+            }}
+          >
+            <header className="career-column-header">
+              <h3 id={`career-col-${id}`} className="career-column-title">
+                <span className={`career-status-dot status-${id}`} aria-hidden="true" />
+                {label}
+              </h3>
+              <span className="career-column-count career-figure">{items.length}</span>
+            </header>
+            <div className="career-column-body">
+              {items.length === 0 ? (
+                <p className="career-empty">None</p>
+              ) : items.map(app => (
+                <ApplicationCard
+                  key={app.id}
+                  app={app}
+                  onOpen={onOpen}
+                  onDragStart={setDragId}
+                  onDragEnd={() => { setDragId(null); setOverStatus(null); }}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function LeadsPanel({ leads, onPromote, onDismiss, onAdd, busyId }) {
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState(EMPTY_LEAD);
+  const [saving, setSaving] = useState(false);
+  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const ok = await onAdd(form);
+    setSaving(false);
+    if (ok) { setForm(EMPTY_LEAD); setAdding(false); }
+  };
+
+  return (
+    <div className="glass-panel">
+      <div className="panel-header">
+        <h2 className="panel-title">Open leads</h2>
+        <button type="button" className="btn-secondary" onClick={() => setAdding(a => !a)} aria-expanded={adding}>
+          {adding ? 'Cancel' : 'Add lead'}
+        </button>
+      </div>
+      <div className="panel-content career-panel-content">
+        {adding && (
+          <form className="career-lead-form" onSubmit={submit}>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-company">Company</label>
+                <input id="lead-company" className="form-input" value={form.company} onChange={set('company')} required autoFocus />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-role">Role</label>
+                <input id="lead-role" className="form-input" value={form.role} onChange={set('role')} required />
+              </div>
+            </div>
+            <div className="form-group career-form-row">
+              <label className="form-label" htmlFor="lead-url">Job listing URL</label>
+              <input id="lead-url" type="url" className="form-input" placeholder="https://" value={form.job_url} onChange={set('job_url')} required />
+            </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-location">Location</label>
+                <input id="lead-location" className="form-input" placeholder="Remote" value={form.location} onChange={set('location')} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-salary">Salary range</label>
+                <input id="lead-salary" className="form-input" placeholder="$120k–$150k" value={form.salary_range} onChange={set('salary_range')} />
+              </div>
+            </div>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Adding…' : 'Add lead'}</button>
+          </form>
+        )}
+
+        {leads.length === 0 ? (
+          <p className="career-empty">No open leads. Your agents add them here, or add one yourself.</p>
+        ) : (
+          <ul className="item-list career-lead-list">
+            {leads.map(lead => (
+              <li key={lead.id} className="list-item career-lead">
+                <div className="item-meta">
+                  <span className="item-title">{lead.role}</span>
+                  <span className="item-subtitle">
+                    {[lead.company, lead.location, lead.salary_range].filter(Boolean).join(' · ')}
+                  </span>
+                  <span className="item-subtitle">
+                    {lead.job_url && (
+                      <a href={lead.job_url} target="_blank" rel="noopener noreferrer" className="career-link">View listing</a>
+                    )}
+                    {lead.match_score > 0 && <span> · {lead.match_score}% match</span>}
+                    {lead.created_by && <span> · via {lead.created_by}</span>}
+                  </span>
+                </div>
+                <div className="career-lead-actions">
+                  <button type="button" className="btn-secondary" disabled={busyId === lead.id} onClick={() => onDismiss(lead)}>
+                    Dismiss
+                  </button>
+                  <button type="button" className="btn-primary career-btn-sm" disabled={busyId === lead.id} onClick={() => onPromote(lead)}>
+                    Mark applied
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LogApplicationDialog({ open, onClose, onSubmit }) {
+  const ref = useDialog(open, onClose);
+  const [saving, setSaving] = useState(false);
+  if (!open) return null;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const payload = {};
+    ['company', 'role', 'date_applied', 'status', 'job_description_url', 'salary_range', 'recruiter_name', 'recruiter_email', 'notes']
+      .forEach(k => { if (form[k].value.trim()) payload[k] = form[k].value.trim(); });
+    setSaving(true);
+    const ok = await onSubmit(payload);
+    setSaving(false);
+    if (ok) onClose();
+  };
+
+  return (
+    <div className="athena-modal-overlay" onClick={onClose}>
+      <div
+        ref={ref}
+        className="athena-modal-card career-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="career-log-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="career-sheet-header">
+          <h2 id="career-log-title" className="career-sheet-title">Log application</h2>
+          <button type="button" className="career-icon-btn" aria-label="Close" onClick={onClose}>
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <form className="career-sheet-body" onSubmit={submit}>
+          <p className="career-hint">If you already logged this job (same link, or same company and role within 90 days), it's updated instead.</p>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-company">Company</label>
+              <input id="log-company" name="company" className="form-input" required data-autofocus />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-role">Role</label>
+              <input id="log-role" name="role" className="form-input" required />
+            </div>
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-date">Date applied</label>
+              <input id="log-date" name="date_applied" type="date" className="form-input" defaultValue={today()} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-status">Status</label>
+              <select id="log-status" name="status" className="form-select" defaultValue="applied">
+                {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-group career-form-row">
+            <label className="form-label" htmlFor="log-url">Job listing URL</label>
+            <input id="log-url" name="job_description_url" type="url" className="form-input" placeholder="https://" />
+          </div>
+          <div className="form-group career-form-row">
+            <label className="form-label" htmlFor="log-salary">Salary range</label>
+            <input id="log-salary" name="salary_range" className="form-input" />
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-rname">Recruiter name</label>
+              <input id="log-rname" name="recruiter_name" className="form-input" />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="log-remail">Recruiter email</label>
+              <input id="log-remail" name="recruiter_email" type="email" className="form-input" />
+            </div>
+          </div>
+          <div className="form-group career-form-row">
+            <label className="form-label" htmlFor="log-notes">Notes</label>
+            <textarea id="log-notes" name="notes" rows={3} className="form-textarea" />
+          </div>
+          <div className="career-sheet-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Log application'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Timeline({ events }) {
+  if (!events?.length) return <p className="career-empty">Nothing on the timeline yet.</p>;
+  const ordered = [...events].reverse();
+  return (
+    <ol className="career-timeline">
+      {ordered.map(ev => (
+        <li key={ev.id} className="career-timeline-item">
+          <div className="career-timeline-head">
+            <span className="career-timeline-kind">{EVENT_LABEL[ev.kind] || ev.kind}</span>
+            <span className="career-figure">{formatDate(ev.event_date)}</span>
+          </div>
+          {ev.note && <p className="career-timeline-note">{ev.note}</p>}
+          {ev.created_by && <span className="career-timeline-by">by {ev.created_by}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ApplicationDrawer({ app, onClose, onSave, onStatus, onAddEvent, onDelete }) {
+  // Keyed by application id, so this state resets when a different application opens
+  const ref = useDialog(true, onClose);
+  const [fields, setFields] = useState(() => Object.fromEntries(APP_FIELDS.map(k => [k, app[k] || ''])));
+  const [eventForm, setEventForm] = useState({ kind: 'interview', event_date: today(), note: '' });
+  const [saving, setSaving] = useState(false);
+  const [addingEvent, setAddingEvent] = useState(false);
+
+  const set = (key) => (e) => setFields(f => ({ ...f, [key]: e.target.value }));
+  const changed = APP_FIELDS.filter(k => (fields[k] ?? '') !== (app[k] || ''));
+  // The API ignores blank values, so a field can be changed but not emptied
+  const cleared = changed.filter(k => !fields[k]?.trim());
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (changed.length === 0 || cleared.length > 0) return;
+    setSaving(true);
+    await onSave(app.id, Object.fromEntries(changed.map(k => [k, fields[k]])));
+    setSaving(false);
+  };
+
+  const addEvent = async (e) => {
+    e.preventDefault();
+    setAddingEvent(true);
+    const ok = await onAddEvent(app.id, eventForm);
+    setAddingEvent(false);
+    if (ok) setEventForm(f => ({ ...f, note: '' }));
+  };
+
+  const field = (key, label, props = {}) => (
+    <div className="form-group">
+      <label className="form-label" htmlFor={`app-${key}`}>{label}</label>
+      <input id={`app-${key}`} className="form-input" value={fields[key] ?? ''} onChange={set(key)} {...props} />
+    </div>
+  );
+
+  return (
+    <div className="athena-modal-overlay career-drawer-overlay" onClick={onClose}>
+      <aside
+        ref={ref}
+        className="athena-modal-card career-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="career-drawer-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="career-sheet-header">
+          <div className="career-drawer-heading">
+            <h2 id="career-drawer-title" className="career-sheet-title">{app.role}</h2>
+            <span className="career-drawer-sub">
+              {app.company}
+              {app.created_by && ` · logged by ${app.created_by}`}
+            </span>
+          </div>
+          <button type="button" className="career-icon-btn" aria-label="Close details" onClick={onClose}>
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <div className="career-sheet-body">
+          <div className="form-group career-form-row">
+            <label className="form-label" htmlFor="app-status">Status</label>
+            <select id="app-status" className="form-select" value={app.status} onChange={e => onStatus(app.id, e.target.value)} data-autofocus>
+              {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+
+          <section className="career-drawer-section" aria-labelledby="career-details-title">
+            <h3 id="career-details-title" className="career-section-title">Details</h3>
+            <form onSubmit={save}>
+              <div className="form-grid">
+                {field('company', 'Company', { required: true })}
+                {field('role', 'Role', { required: true })}
+              </div>
+              <div className="form-grid">
+                {field('date_applied', 'Date applied', { type: 'date', required: true })}
+                {field('salary_range', 'Salary range')}
+              </div>
+              <div className="form-group career-form-row">
+                <label className="form-label" htmlFor="app-job_description_url">
+                  Job listing URL
+                  {app.job_description_url && (
+                    <> · <a href={app.job_description_url} target="_blank" rel="noopener noreferrer" className="career-link">Open</a></>
+                  )}
+                </label>
+                <input id="app-job_description_url" type="url" className="form-input" value={fields.job_description_url ?? ''} onChange={set('job_description_url')} />
+              </div>
+              <div className="form-grid">
+                {field('recruiter_name', 'Recruiter name')}
+                {field('recruiter_email', 'Recruiter email', { type: 'email' })}
+              </div>
+              <div className="form-group career-form-row">
+                <label className="form-label" htmlFor="app-notes">Notes</label>
+                <textarea id="app-notes" rows={3} className="form-textarea" value={fields.notes ?? ''} onChange={set('notes')} />
+              </div>
+              {cleared.length > 0 && (
+                <p className="career-hint career-form-row" role="status">
+                  A field can't be emptied yet. Type a new value, or undo the change.
+                </p>
+              )}
+              <button type="submit" className="btn-primary" disabled={saving || changed.length === 0 || cleared.length > 0}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </form>
+          </section>
+
+          <section className="career-drawer-section" aria-labelledby="career-timeline-title">
+            <h3 id="career-timeline-title" className="career-section-title">Timeline</h3>
+            <form className="career-event-form" onSubmit={addEvent}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="event-kind">Type</label>
+                  <select id="event-kind" className="form-select" value={eventForm.kind} onChange={e => setEventForm(f => ({ ...f, kind: e.target.value }))}>
+                    {EVENT_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="event-date">Date</label>
+                  <input id="event-date" type="date" className="form-input" value={eventForm.event_date} onChange={e => setEventForm(f => ({ ...f, event_date: e.target.value }))} required />
+                </div>
+              </div>
+              <div className="form-group career-form-row">
+                <label className="form-label" htmlFor="event-note">Note</label>
+                <input id="event-note" className="form-input" placeholder="Phone screen with the hiring manager" value={eventForm.note} onChange={e => setEventForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+              <button type="submit" className="btn-secondary" disabled={addingEvent}>{addingEvent ? 'Adding…' : 'Add to timeline'}</button>
+            </form>
+            <Timeline events={app.events} />
+          </section>
+
+          <section className="career-drawer-section">
+            <button type="button" className="btn-danger" onClick={() => onDelete(app)}>
+              <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+              Delete application
+            </button>
+          </section>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function CareerTab({ careerData, renderRelatedAreas, showToast }) {
+  const [data, setData] = useState(careerData || { applications: [], leads: [], stats: {} });
+  const [syncedProp, setSyncedProp] = useState(careerData);
+  const [openId, setOpenId] = useState(null);
+  const [logOpen, setLogOpen] = useState(false);
+  const [busyLeadId, setBusyLeadId] = useState(null);
+
+  // Take a fresh snapshot when the app-wide refresh delivers one
+  if (careerData && careerData !== syncedProp) {
+    setSyncedProp(careerData);
+    setData(careerData);
+  }
+
+  const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/career`).then(r => r.json());
-      setLocalData(res);
-      if (res.profiles && res.profiles.length > 0 && !ingestProfileId) {
-        setIngestProfileId(String(res.profiles[0].id));
-      }
+      setData(await request('/career'));
+    } catch {
+      showToast("Couldn't refresh career data. Check the connection and reload.", 'error');
+    }
+  }, [showToast]);
+
+  // Runs a mutation, refreshes, and reports. Returns true on success.
+  const mutate = async (fn, success, failure) => {
+    try {
+      const res = await fn();
+      await refresh();
+      if (success) showToast(typeof success === 'function' ? success(res) : success, 'success');
+      return true;
     } catch (err) {
-      console.error("Error fetching career data locally:", err);
+      showToast(`${failure} ${err.message || ''}`.trim(), 'error');
+      return false;
     }
   };
 
-  const handleIngestUrl = async (e) => {
-    e.preventDefault();
-    if (!pastedUrl || !ingestProfileId) return;
-    setIngesting(true);
-    try {
-      const res = await fetch(`${API_BASE}/career/leads/url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pastedUrl, profile_id: parseInt(ingestProfileId) })
-      }).then(r => r.json());
-      
-      if (res.status === 'success') {
-        setPastedUrl('');
-        showToast(`Added lead: ${res.title} at ${res.company}`, "success");
-        await refreshData();
-      } else {
-        showToast("Couldn't add that link. " + (res.detail || "Check the URL and try again."), "error");
-      }
-    } catch {
-      showToast("Couldn't add that link. Check your connection and try again.", "error");
-    } finally {
-      setIngesting(false);
-    }
+  const moveApplication = (id, status) => {
+    // Optimistic move so the card lands where it was dropped
+    setData(d => ({ ...d, applications: d.applications.map(a => (a.id === id ? { ...a, status } : a)) }));
+    return mutate(
+      () => request(`/career/applications/${id}`, 'PUT', { status }),
+      `Moved to ${STATUS_LABEL[status].toLowerCase()}.`,
+      "Couldn't move that application.",
+    );
   };
 
-  const handleIgnoreLead = async (leadId) => {
-    if (!confirm("Ignore this lead? It will leave your queue.")) return;
-    try {
-      const res = await fetch(`${API_BASE}/career/leads/${leadId}/ignore`, { method: 'POST' }).then(r => r.json());
-      if (res.status === 'success') {
-        setSelectedLead(null);
-        await refreshData();
-      }
-    } catch {
-      showToast("Couldn't ignore that lead. Try again.", "error");
-    }
+  const saveApplication = (id, fields) => mutate(
+    () => request(`/career/applications/${id}`, 'PUT', fields),
+    'Changes saved.',
+    "Couldn't save changes.",
+  );
+
+  const addEvent = (id, ev) => mutate(
+    () => request(`/career/applications/${id}/events`, 'POST', { kind: ev.kind, event_date: ev.event_date, note: ev.note || null }),
+    'Added to the timeline.',
+    "Couldn't add that entry.",
+  );
+
+  const deleteApplication = async (app) => {
+    if (!confirm(`Delete the ${app.role} application at ${app.company} and its timeline? This can't be undone.`)) return;
+    const ok = await mutate(
+      () => request(`/career/applications/${app.id}`, 'DELETE'),
+      'Application deleted.',
+      "Couldn't delete the application.",
+    );
+    if (ok) setOpenId(null);
   };
 
-  const handleProcessLead = async (leadId) => {
-    setProcessingLeadId(leadId);
-    try {
-      const res = await fetch(`${API_BASE}/career/leads/${leadId}/approve`, { method: 'POST' }).then(r => r.json());
-      if (res.status === 'success') {
-        showToast("Application tailored. The cover letter and outreach draft are ready under Outreach.", "success");
-        setSelectedLead(null);
-        setActiveSubTab('outreach');
-        await refreshData();
-        
-        const newApp = res.application_id;
-        const freshData = await fetch(`${API_BASE}/career`).then(r => r.json());
-        const matched = freshData.applications.find(a => a.id === newApp);
-        if (matched) {
-          handleSelectApp(matched);
-        }
-      } else {
-        showToast("Tailoring failed. " + (res.detail || "Try again."), "error");
-      }
-    } catch {
-      showToast("Tailoring failed. Try again.", "error");
-    } finally {
-      setProcessingLeadId(null);
-    }
+  const logApplication = (payload) => mutate(
+    () => request('/career', 'POST', payload),
+    res => (res.result === 'updated'
+      ? 'That job was already logged, so its entry was updated.'
+      : `Logged ${payload.role} at ${payload.company}.`),
+    "Couldn't log the application.",
+  );
+
+  const addLead = (lead) => mutate(
+    () => request('/career/leads', 'POST', Object.fromEntries(Object.entries(lead).filter(([, v]) => v.trim()))),
+    res => (res.result === 'updated' ? 'That listing was already a lead, so it was updated.' : 'Lead added.'),
+    "Couldn't add the lead.",
+  );
+
+  const promoteLead = async (lead) => {
+    setBusyLeadId(lead.id);
+    await mutate(
+      () => request(`/career/leads/${lead.id}/promote`, 'POST', {}),
+      res => (res.result === 'updated'
+        ? `Matched an existing ${lead.company} application and linked the lead.`
+        : `Logged ${lead.role} at ${lead.company} as applied.`),
+      "Couldn't mark that lead applied.",
+    );
+    setBusyLeadId(null);
   };
 
-  const handleSelectApp = (app) => {
-    setSelectedApp(app);
-    setEditRecruiterName(app.recruiter_name || 'Hiring Team');
-    setEditRecruiterEmail(app.recruiter_email || '');
-    setEditColdEmail(app.cold_email_draft || '');
-    setEditBullets(app.tailored_bullets || '');
-    setEditCoverLetter(app.cover_letter || '');
+  const dismissLead = async (lead) => {
+    setBusyLeadId(lead.id);
+    await mutate(
+      () => request(`/career/leads/${lead.id}/ignore`, 'POST'),
+      `Dismissed ${lead.role} at ${lead.company}.`,
+      "Couldn't dismiss that lead.",
+    );
+    setBusyLeadId(null);
   };
 
-  const handleSaveAppEdits = async () => {
-    if (!selectedApp) return;
-    setIsSavingAppEdits(true);
-    try {
-      const res = await fetch(`${API_BASE}/career/applications/${selectedApp.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recruiter_name: editRecruiterName,
-          recruiter_email: editRecruiterEmail,
-          cold_email_draft: editColdEmail,
-          tailored_bullets: editBullets,
-          cover_letter: editCoverLetter
-        })
-      }).then(r => r.json());
-      
-      if (res.status === 'success') {
-        showToast("Edits saved.", "success");
-        await refreshData();
-        const updatedApp = {
-          ...selectedApp,
-          recruiter_name: editRecruiterName,
-          recruiter_email: editRecruiterEmail,
-          cold_email_draft: editColdEmail,
-          tailored_bullets: editBullets,
-          cover_letter: editCoverLetter
-        };
-        setSelectedApp(updatedApp);
-      } else {
-        showToast("Couldn't save edits. " + (res.detail || "Try again."), "error");
-      }
-    } catch {
-      showToast("Couldn't save edits. Try again.", "error");
-    } finally {
-      setIsSavingAppEdits(false);
-    }
-  };
-
-  const handleSendEmail = async (appId) => {
-    if (!confirm("Send this outreach email now?")) return;
-    setSendingEmailId(appId);
-    try {
-      const res = await fetch(`${API_BASE}/career/applications/${appId}/send-email`, { method: 'POST' }).then(r => r.json());
-      if (res.status === 'success') {
-        showToast(res.message, "success");
-        await refreshData();
-        if (selectedApp && selectedApp.id === appId) {
-          setSelectedApp(prev => ({ ...prev, outreach_status: 'sent' }));
-        }
-      } else {
-        showToast("Couldn't send the email. " + (res.detail || "Try again."), "error");
-      }
-    } catch {
-      showToast("Couldn't send the email. Try again.", "error");
-    } finally {
-      setSendingEmailId(null);
-    }
-  };
-
-  const handleTriggerScrape = async () => {
-    setScraping(true);
-    try {
-      const res = await fetch(`${API_BASE}/career/scrape`, { method: 'POST' }).then(r => r.json());
-      if (res.status === 'started') {
-        showToast("Discovery started. New leads will appear shortly.", "success");
-      }
-    } catch {
-      showToast("Couldn't start discovery. Try again.", "error");
-    } finally {
-      setScraping(false);
-    }
-  };
-
-  const handleAddProfile = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/career/profiles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profileForm)
-      }).then(r => r.json());
-      
-      if (res.status === 'success') {
-        setProfileForm({ name: '', resume_path: '', keywords: '', locations: '', active: 1 });
-        showToast("Search profile added.", "success");
-        await refreshData();
-      }
-    } catch {
-      showToast("Couldn't add the profile. Try again.", "error");
-    }
-  };
-
-  const handleDeleteProfile = async (id) => {
-    if (!confirm("Delete this search profile? This can't be undone.")) return;
-    try {
-      const res = await fetch(`${API_BASE}/career/profiles/${id}`, { method: 'DELETE' }).then(r => r.json());
-      if (res.status === 'success') {
-        await refreshData();
-      }
-    } catch {
-      showToast("Couldn't delete the profile. Try again.", "error");
-    }
-  };
-
-  const copyToClipboard = (text, message = "Copied to clipboard!") => {
-    navigator.clipboard.writeText(text);
-    showToast(message, "success");
-  };
-
-  const stats = localData.stats || {};
+  const applications = data.applications || [];
+  const leads = data.leads || [];
+  const stats = data.stats || {};
+  const openApp = applications.find(a => a.id === openId) || null;
 
   return (
     <div>
       <header className="page-header page-header--compact">
         <h1 className="page-title">Career</h1>
         <div className="page-header-meta">
-          <p className="page-subtitle">Priority 1: Income</p>
-          <button 
-            onClick={handleTriggerScrape} 
-            disabled={scraping} 
-            className="btn-primary" 
-            style={{ fontSize: 'var(--text-sm)', padding: '0.5rem 1rem', border: '1px solid var(--accent-cyan)', background: 'var(--surface-2)', color: 'var(--accent-cyan)' }}
-          >
-            {scraping ? "Running discovery…" : "Run discovery"}
+          <p className="page-subtitle">
+            {plural(stats.active_applications || 0, 'active', 'active')} · {plural(stats.by_status?.offered || 0, 'offer')} · {plural(stats.open_leads ?? leads.length, 'open lead')}
+          </p>
+          <button type="button" className="btn-primary" onClick={() => setLogOpen(true)}>
+            <span className="material-symbols-outlined" aria-hidden="true">add</span>
+            Log application
           </button>
         </div>
       </header>
 
-      {/* Metrics Banner */}
-      <div className="grid-4col" style={{ marginBottom: '1.25rem', gap: '0.75rem' }}>
-        <div className="glass-panel" style={{ padding: '0.75rem', }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Leads found</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-cyan)', fontSize: 'var(--text-lg)' }}>{localData.leads?.length || 0}</h3>
+      <section className="career-board-section" aria-labelledby="career-pipeline-title">
+        <div className="career-board-heading">
+          <h2 id="career-pipeline-title" className="panel-title">Pipeline</h2>
+          <span className="career-hint career-hint--desktop">Drag a card to change its status, or open it for details.</span>
+          <span className="career-hint career-hint--touch">Tap a card for details and to change its status.</span>
         </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>US remote</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-green)', fontSize: 'var(--text-lg)' }}>{stats.tier1_count || 0}</h3>
-        </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>New England</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--accent-yellow)', fontSize: 'var(--text-lg)' }}>{stats.tier2_count || 0}</h3>
-        </div>
-        <div className="glass-panel" style={{ padding: '0.75rem', }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Tailored applications</span>
-          <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-lg)' }}>{localData.applications?.length || 0}</h3>
-        </div>
+        {applications.length === 0 ? (
+          <div className="glass-panel career-board-empty">
+            <p className="career-empty">No applications yet. Log one, or mark a lead applied.</p>
+          </div>
+        ) : (
+          <PipelineBoard applications={applications} onOpen={setOpenId} onMove={moveApplication} />
+        )}
+      </section>
+
+      <div className="grid-2col career-lower">
+        <LeadsPanel
+          leads={leads}
+          onPromote={promoteLead}
+          onDismiss={dismissLead}
+          onAdd={addLead}
+          busyId={busyLeadId}
+        />
+        <div>{renderRelatedAreas('Career')}</div>
       </div>
 
-      {/* Sub-Navigation Tabs */}
-      <div className="tab-navigation" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
-        <button 
-          className={`tab-btn ${activeSubTab === 'leads' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('leads')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'leads' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'leads' ? '2px solid var(--accent-cyan)' : 'none', color: activeSubTab === 'leads' ? 'var(--accent-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}
-        >
-          Ready to apply ({localData.leads?.length || 0})
-        </button>
-        <button 
-          className={`tab-btn ${activeSubTab === 'outreach' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('outreach')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'outreach' ? 'var(--surface-2)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'outreach' ? '2px solid var(--text-secondary)' : 'none', color: activeSubTab === 'outreach' ? 'var(--text-secondary)' : 'var(--text-muted)', cursor: 'pointer' }}
-        >
-          Outreach ({localData.applications?.length || 0})
-        </button>
-        <button 
-          className={`tab-btn ${activeSubTab === 'profiles' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('profiles')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'profiles' ? 'color-mix(in srgb, var(--color-warning) 10%, transparent)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'profiles' ? '2px solid var(--accent-yellow)' : 'none', color: activeSubTab === 'profiles' ? 'var(--accent-yellow)' : 'var(--text-muted)', cursor: 'pointer' }}
-        >
-          Search profiles
-        </button>
-        <button 
-          className={`tab-btn ${activeSubTab === 'tracker' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('tracker')}
-          style={{ padding: '0.5rem 1rem', background: activeSubTab === 'tracker' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'transparent', border: 'none', borderBottom: activeSubTab === 'tracker' ? '2px solid var(--accent-green)' : 'none', color: activeSubTab === 'tracker' ? 'var(--accent-green)' : 'var(--text-muted)', cursor: 'pointer' }}
-        >
-          Applications
-        </button>
-      </div>
-
-      {/* SUBTAB 1: JOB LEADS QUEUE */}
-      {activeSubTab === 'leads' && (
-        <div className="grid-2col">
-          {/* Left Column: Leads list */}
-          <div className="glass-panel">
-            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="panel-title">Target Job Opportunities</h3>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'inherit' }}>Sorted by match score</span>
-            </div>
-            
-            <div className="panel-content">
-              {(!localData.leads || localData.leads.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)', }}>No active job leads in queue. Click 'Run discovery' above to ingest fresh positions.</p>
-              ) : (
-                <div className="item-list" style={{ maxHeight: '550px', overflowY: 'auto' }}>
-                  {localData.leads.map((lead) => (
-                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
-                      key={lead.id} 
-                      className={`list-item ${selectedLead?.id === lead.id ? 'active' : ''}`}
-                      onClick={() => setSelectedLead(lead)}
-                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', background: selectedLead?.id === lead.id ? 'var(--surface-2)' : undefined, marginBottom: '0.5rem' }}
-                    >
-                      <div className="item-meta">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span className="item-title" style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>{lead.role}</span>
-                          <span style={{ 
-                            fontSize: 'var(--text-xs)', 
-                            padding: '0.15rem 0.4rem', 
-                            borderRadius: '3px', 
-                            fontWeight: 'bold',
-                            background: (lead.match_score || 70) >= 80 ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
-                            color: (lead.match_score || 70) >= 80 ? 'var(--accent-green)' : 'var(--accent-yellow)',
-                            border: (lead.match_score || 70) >= 80 ? '1px solid var(--accent-green)' : '1px solid var(--accent-yellow)'
-                          }}>
-                            Match: {lead.match_score || 75}%
-                          </span>
-                        </div>
-                        <span className="item-subtitle" style={{ fontSize: 'var(--text-sm)' }}>{lead.company} • <span style={{ fontStyle: 'italic' }}>{lead.location}</span></span>
-                        
-                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {lead.is_remote ? (
-                            <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.3rem', background: 'var(--surface-2)', color: 'var(--accent-cyan)', borderRadius: '3px', border: '1px solid var(--accent-cyan)' }}>
-                              US remote
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.3rem', background: 'var(--surface-2)', color: 'var(--text-secondary)', borderRadius: '3px', border: '1px solid var(--text-secondary)' }}>
-                              New England regional
-                            </span>
-                          )}
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                            Source: {lead.source.toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Lead details & Ingest panel */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Lead Details display */}
-            {selectedLead ? (
-              <div className="glass-panel">
-                <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h3 className="panel-title">{selectedLead.role}</h3>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{selectedLead.company}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      onClick={() => handleIgnoreLead(selectedLead.id)} 
-                      className="btn-danger" 
-                      style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--text-xs)' }}
-                    >
-                      Ignore
-                    </button>
-                    <button 
-                      onClick={() => handleProcessLead(selectedLead.id)} 
-                      disabled={processingLeadId !== null}
-                      className="btn-primary" 
-                      style={{ padding: '0.3rem 0.75rem', fontSize: 'var(--text-xs)', fontWeight: 'bold' }}
-                    >
-                      {processingLeadId === selectedLead.id ? "Tailoring…" : "Approve and tailor"}
-                    </button>
-                  </div>
-                </div>
-                <div className="panel-content" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                  <p style={{ fontSize: 'var(--text-sm)', marginBottom: '0.5rem' }}>
-                    <strong>Location:</strong> {selectedLead.location} | <strong>Classification:</strong> {selectedLead.is_remote ? 'Tier 1 US Remote' : 'Tier 2 New England Regional'}
-                  </p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--accent-cyan)' }}>
-                    <a href={selectedLead.job_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View listing on portal</a>
-                  </p>
-                  <hr style={{ border: 'none', borderBottom: '1px solid var(--border-glass)', margin: '0.75rem 0' }} />
-                  <p style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', marginBottom: '0.25rem' }}>Job Description:</p>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                    {selectedLead.job_description}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <div className="glass-panel" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
-                <p style={{ color: 'var(--text-muted)' }}>Select a job lead from the queue to view details and generate a tailored application packet.</p>
-              </div>
-            )}
-
-            {/* Paste URL for Ingestion */}
-            <div className="glass-panel">
-              <div className="panel-header">
-                <h3 className="panel-title">Direct URL Ingest</h3>
-              </div>
-              <div className="panel-content">
-                <form onSubmit={handleIngestUrl}>
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="form-label">Job Posting URL</label>
-                    <input 
-                      type="url" 
-                      placeholder="https://www.linkedin.com/jobs/view/..." 
-                      className="form-input" 
-                      value={pastedUrl} 
-                      onChange={e => setPastedUrl(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  
-                  <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                    <label className="form-label">Search Track Target</label>
-                    <select 
-                      className="form-select" 
-                      value={ingestProfileId} 
-                      onChange={e => setIngestProfileId(e.target.value)} 
-                      required
-                    >
-                      {localData.profiles?.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={ingesting}>
-                    {ingesting ? "Ingesting..." : "Ingest Listing"}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
+      {openApp && (
+        <ApplicationDrawer
+          key={openApp.id}
+          app={openApp}
+          onClose={() => setOpenId(null)}
+          onSave={saveApplication}
+          onStatus={moveApplication}
+          onAddEvent={addEvent}
+          onDelete={deleteApplication}
+        />
       )}
-
-      {/* SUBTAB 2: OUTREACH & TAILORING STATION */}
-      {activeSubTab === 'outreach' && (
-        <div className="grid-2col">
-          {/* Left Column: Applications list with outreach pending */}
-          <div className="glass-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Outreach Station & Staged Packets</h3>
-            </div>
-            <div className="panel-content">
-              {(!localData.applications || localData.applications.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)' }}>No tailored outreach templates found. Click 'APPROVE & TAILOR' on a lead in the queue first.</p>
-              ) : (
-                <div className="item-list">
-                  {localData.applications.map((app) => (
-                    <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
-                      key={app.id} 
-                      className={`list-item ${selectedApp?.id === app.id ? 'active' : ''}`}
-                      onClick={() => handleSelectApp(app)}
-                      style={{ cursor: 'pointer', padding: '0.75rem', borderRadius: '4px', background: selectedApp?.id === app.id ? 'var(--surface-2)' : undefined, marginBottom: '0.5rem' }}
-                    >
-                      <div className="item-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div>
-                          <span className="item-title" style={{ fontWeight: 'bold' }}>{app.role}</span>
-                          <span className="item-subtitle">{app.company}</span>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
-                            Recruiter: {app.recruiter_name || 'Hiring Team'} ({app.recruiter_email || 'No email'})
-                          </span>
-                        </div>
-                        <span className={`badge badge-${app.outreach_status || 'pending'}`}>
-                          Outreach: {app.outreach_status || 'pending'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Tailoring Review & Email Sender */}
-          <div className="glass-panel" style={{ width: '100%' }}>
-            {selectedApp ? (
-              <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
-                  <div>
-                    <h3 className="panel-title" style={{ color: 'var(--text-secondary)' }}>{selectedApp.role} @ {selectedApp.company}</h3>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Dual-Anchor Application Packet</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      onClick={handleSaveAppEdits} 
-                      disabled={isSavingAppEdits}
-                      className="btn-secondary" 
-                      style={{ fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem' }}
-                    >
-                      {isSavingAppEdits ? "Saving..." : "Save Edits"}
-                    </button>
-                    <button 
-                      onClick={() => handleSendEmail(selectedApp.id)} 
-                      disabled={sendingEmailId === selectedApp.id || selectedApp.outreach_status === 'sent'}
-                      className="btn-primary" 
-                      style={{ background: selectedApp.outreach_status === 'sent' ? 'var(--bg-surface)' : 'var(--text-primary)', color: selectedApp.outreach_status === 'sent' ? 'var(--text-muted)' : 'var(--bg-primary, #ffffff) !important', border: selectedApp.outreach_status === 'sent' ? '1px solid var(--border-cyan)' : 'none', fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}
-                    >
-                      {sendingEmailId === selectedApp.id ? "Sending..." : selectedApp.outreach_status === 'sent' ? "Outreach Logged" : "Send outreach email"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Recruiter Details Form */}
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Recruiter / Manager Name</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      value={editRecruiterName} 
-                      onChange={e => setEditRecruiterName(e.target.value)} 
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Recruiter Email Address</label>
-                    <input 
-                      type="email" 
-                      className="form-input" 
-                      value={editRecruiterEmail} 
-                      onChange={e => setEditRecruiterEmail(e.target.value)} 
-                    />
-                  </div>
-                </div>
-
-                {/* Cold Outreach Email Editor */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label">Recruiter Cold Email (With Calendar Slots)</label>
-                    <button 
-                      className="link-btn" 
-                      onClick={() => copyToClipboard(editColdEmail, "Email draft copied!")} 
-                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Copy Draft
-                    </button>
-                  </div>
-                  <textarea 
-                    rows={6} 
-                    className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
-                    value={editColdEmail} 
-                    onChange={e => setEditColdEmail(e.target.value)} 
-                  />
-                </div>
-
-                {/* Tailored Bullets Editor */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label">Dual-Anchor Resume Bullets (7Y Experience + CS/AI Degree)</label>
-                    <button 
-                      className="link-btn" 
-                      onClick={() => copyToClipboard(editBullets, "Tailored bullets copied!")} 
-                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Copy Bullets
-                    </button>
-                  </div>
-                  <textarea 
-                    rows={4} 
-                    className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
-                    value={editBullets} 
-                    onChange={e => setEditBullets(e.target.value)} 
-                  />
-                </div>
-
-                {/* Tailored Cover Letter Editor */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label">Tailored Cover Letter</label>
-                    <button 
-                      className="link-btn" 
-                      onClick={() => copyToClipboard(editCoverLetter, "Cover letter copied!")} 
-                      style={{ fontSize: 'var(--text-xs)', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Copy Cover Letter
-                    </button>
-                  </div>
-                  <textarea 
-                    rows={6} 
-                    className="form-input" 
-                    style={{ resize: 'vertical', width: '100%', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', color: 'inherit', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}
-                    value={editCoverLetter} 
-                    onChange={e => setEditCoverLetter(e.target.value)} 
-                  />
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', height: '100%', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
-                Select a tailored application in the outreach list to review materials.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 3: SEARCH PROFILES */}
-      {activeSubTab === 'profiles' && (
-        <div className="grid-2col">
-          {/* Left Column: Manage Profiles list */}
-          <div className="glass-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Active Job Search Tracks</h3>
-            </div>
-            <div className="panel-content">
-              {(!localData.profiles || localData.profiles.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)' }}>No search profiles defined yet. Add one below.</p>
-              ) : (
-                <div className="item-list">
-                  {localData.profiles.map(p => (
-                    <div key={p.id} className="list-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', border: '1px solid var(--border-glass)', borderRadius: '4px', marginBottom: '0.5rem' }}>
-                      <div className="item-meta">
-                        <span className="item-title" style={{ fontWeight: 'bold' }}>{p.name}</span>
-                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>Keywords: {p.keywords}</span>
-                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>Locations: {p.locations}</span>
-                        {p.resume_path && <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)', fontFamily: 'inherit', color: 'var(--text-secondary)' }}>Resume: {p.resume_path.split('/').pop()}</span>}
-                      </div>
-                      <button 
-                        onClick={() => handleDeleteProfile(p.id)} 
-                        className="btn-primary" 
-                        style={{ background: 'color-mix(in srgb, var(--color-danger) 10%, transparent)', color: 'var(--color-danger)', border: 'none', padding: '0.2rem 0.5rem', fontSize: 'var(--text-xs)' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Add Profile form */}
-          <div className="glass-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Add Search Profile</h3>
-            </div>
-            <div className="panel-content">
-              <form onSubmit={handleAddProfile}>
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label className="form-label">Profile Track Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. AI Agent & Software Engineering" 
-                    className="form-input" 
-                    value={profileForm.name} 
-                    onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} 
-                    required 
-                  />
-                </div>
-                
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label className="form-label">Master Resume File Path (Optional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="./storage/sample_resume.html" 
-                    className="form-input" 
-                    value={profileForm.resume_path} 
-                    onChange={e => setProfileForm({ ...profileForm, resume_path: e.target.value })} 
-                  />
-                </div>
-                
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label className="form-label">Search Keywords (Comma-separated)</label>
-                  <input 
-                    type="text" 
-                    placeholder="AI Agent, Software Engineer, Machine Learning, Python" 
-                    className="form-input" 
-                    value={profileForm.keywords} 
-                    onChange={e => setProfileForm({ ...profileForm, keywords: e.target.value })} 
-                    required 
-                  />
-                </div>
-                
-                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label">Target Locations (Comma-separated)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Remote, Boston MA, Massachusetts" 
-                    className="form-input" 
-                    value={profileForm.locations} 
-                    onChange={e => setProfileForm({ ...profileForm, locations: e.target.value })} 
-                    required 
-                  />
-                </div>
-                
-                <button type="submit" className="btn-primary" style={{ width: '100%' }}>Create Profile Track</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 4: LOGGED APPLICATIONS LIST */}
-      {activeSubTab === 'tracker' && (
-        <div className="grid-2col">
-          {/* Left Column: Job Applications list */}
-          <div className="glass-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Active Applications Logs</h3>
-            </div>
-            <div className="panel-content">
-              {(!localData.applications || localData.applications.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)' }}>No job applications logged yet.</p>
-              ) : (
-                <div className="item-list" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                  {localData.applications.map((app) => (
-                    <div key={app.id} className="list-item" style={{ padding: '0.75rem', border: '1px solid var(--border-glass)', borderRadius: '4px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div className="item-meta">
-                        <span className="item-title" style={{ fontWeight: 'bold' }}>{app.role} at {app.company}</span>
-                        <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>
-                          Applied: {app.date_applied} {app.salary_range ? `• Salary: ${app.salary_range}` : ''}
-                        </span>
-                        {app.notes && <span className="item-subtitle career-app-notes" style={{ fontStyle: 'italic', marginTop: '0.25rem', display: 'block' }}>"{app.notes}"</span>}
-                        {app.job_description_url && (
-                          <span className="career-app-link" style={{ fontSize: 'var(--text-xs)', marginTop: '0.25rem', display: 'block' }}>
-                            <a href={app.job_description_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
-                              Job Posting URL
-                            </a>
-                          </span>
-                        )}
-                      </div>
-                      <span className={`badge badge-${app.status}`}>
-                        {app.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Log new application manually */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="glass-panel">
-              <div className="panel-header">
-                <h3 className="panel-title">Log New Application (Manual)</h3>
-              </div>
-              <div className="panel-content">
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target;
-                  const payload = {
-                    date_applied: form.date_applied.value,
-                    company: form.company.value,
-                    role: form.role.value,
-                    salary_range: form.salary_range.value,
-                    status: form.status.value,
-                    job_description_url: form.job_description_url.value,
-                    notes: form.notes.value
-                  };
-                  try {
-                    await handleFormSubmit('career', payload, () => {}, {});
-                    form.reset();
-                    await refreshData();
-                  } catch {
-                    showToast("Couldn't log the application. Try again.", "error");
-                  }
-                }}>
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label className="form-label">Date Applied</label>
-                      <input type="date" name="date_applied" className="form-input" defaultValue={new Date().toISOString().split('T')[0]} required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Status</label>
-                      <select name="status" className="form-select" defaultValue="applied">
-                        <option value="applied">Applied</option>
-                        <option value="interviewing">Interviewing</option>
-                        <option value="offered">Offered</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="withdrawn">Withdrawn</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label className="form-label">Company</label>
-                      <input type="text" name="company" placeholder="e.g., Anthropic" className="form-input" required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Role / Title</label>
-                      <input type="text" name="role" placeholder="e.g., AI Agent Engineer" className="form-input" required />
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="form-label">Salary Range / Package</label>
-                    <input type="text" name="salary_range" placeholder="e.g., $110k - $140k" className="form-input" />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="form-label">Job Posting URL</label>
-                    <input type="text" name="job_description_url" placeholder="https://..." className="form-input" />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label className="form-label">Notes & Details</label>
-                    <input type="text" name="notes" placeholder="e.g., Direct application packet" className="form-input" />
-                  </div>
-                  <button type="submit" className="btn-primary" style={{ width: '100%' }}>Add Log Entry</button>
-                </form>
-              </div>
-            </div>
-            {renderRelatedAreas("Career")}
-          </div>
-        </div>
-      )}
+      <LogApplicationDialog open={logOpen} onClose={() => setLogOpen(false)} onSubmit={logApplication} />
     </div>
   );
 }
