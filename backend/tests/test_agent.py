@@ -313,3 +313,12 @@ def test_parse_workout_regimen(monkeypatch, tmp_path):
     assert res_cardio["exercises"] == ["Running"]
 
 
+
+
+def test_write_file_atomically_leaves_readable_file(tmp_path):
+    """Vault files must stay readable by Obsidian (NamedTemporaryFile defaults to 0600)."""
+    target = tmp_path / "note.md"
+    agent.write_file_atomically(str(target), "hello")
+    assert target.read_text() == "hello"
+    assert (target.stat().st_mode & 0o777) == 0o644
+    assert [p.name for p in tmp_path.iterdir()] == ["note.md"]

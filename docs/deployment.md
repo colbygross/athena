@@ -20,7 +20,9 @@ What lives where:
 | Database | `storage/life_dashboard.db` (`/app/storage` in the container) | The only Athena database |
 | Google tokens, MCP data, backups | `storage/` | Persistent |
 | Obsidian vault | `obsidian_vault/` | Persistent |
-| Nightly pipeline | archer crontab: `docker exec athena-prod python3 /app/backend/run_nightly.py` at 23:59 | |
+| Nightly pipeline | archer crontab: `docker exec athena-prod python3 /app/backend/run_nightly.py` at 23:59 | The only scheduler. Inbox analysis runs here too. Don't schedule Athena scripts anywhere else (Hermes, host cron, host venv) |
+| Ollama | archer `127.0.0.1:11434` | The container uses host networking to reach it |
+| File ownership | Container runs as archer (uid 1000) | Vault files stay editable in Obsidian; `deploy.sh` fixes ownership on every deploy |
 
 The production bundle is built with an empty `VITE_API_URL`, so the UI always calls its own origin (`/api`).
 
