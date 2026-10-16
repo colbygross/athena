@@ -123,7 +123,7 @@ Study tracker for Computer Science, engineering, and personal finance topics.
 *   `file_id` (INTEGER REFERENCES processed_files(id) ON DELETE SET NULL)
 
 ### 12. job_applications
-Tracks application leads, status, and salary bounds.
+Jobs actually applied to. Written from the dashboard or by agents through the MCP server ([mcp.md](mcp.md)).
 *   `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
 *   `date_applied` (TEXT NOT NULL) — Format: `YYYY-MM-DD`
 *   `company` (TEXT NOT NULL)
@@ -133,6 +133,28 @@ Tracks application leads, status, and salary bounds.
 *   `job_description_url` (TEXT)
 *   `notes` (TEXT)
 *   `resume_file_id` (INTEGER REFERENCES processed_files(id) ON DELETE SET NULL)
+*   `lead_id` (INTEGER REFERENCES job_leads(id) ON DELETE SET NULL) — set when promoted from a lead
+*   `recruiter_name`, `recruiter_email` (TEXT)
+*   `created_by` (TEXT) — MCP token name, or NULL when added from the dashboard
+
+### 12a. application_events
+Timeline per application: status changes, interviews, recruiter contact, offers, notes.
+*   `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+*   `application_id` (INTEGER NOT NULL REFERENCES job_applications(id) ON DELETE CASCADE)
+*   `event_date` (TEXT NOT NULL) — Format: `YYYY-MM-DD` (may be in the future, e.g. a scheduled interview)
+*   `kind` (TEXT CHECK(kind IN ('status_change', 'interview', 'recruiter_contact', 'offer', 'note')))
+*   `note` (TEXT)
+*   `created_by` (TEXT) — MCP token name, or NULL when added from the dashboard
+
+### 12b. job_leads
+Jobs worth considering (usually suggested by agents). `job_url` is unique; promoting a lead creates a linked application.
+*   `id`, `date_found`, `company`, `role`, `location`, `salary_range`, `job_description`, `job_url` (UNIQUE), `source`
+*   `status` (TEXT CHECK(status IN ('lead', 'ignored', 'applied')) DEFAULT 'lead')
+*   `is_remote`, `tier`, `match_score` (INTEGER)
+*   `created_by` (TEXT)
+
+### 12c. mcp_tokens / mcp_call_log
+Per-agent MCP bearer tokens (`name`, SHA-256 `token_hash`, JSON `scopes`, `last_used_at`, `revoked_at`) and a log of every MCP tool call (`token_name`, `tool`, `ok`, `error`, `called_at`). Managed with `backend/mcp_tokens.py`.
 
 ### 13. habit_logs
 Logs completion of daily micro-habits.

@@ -2338,60 +2338,55 @@ def cleanup_old_completed_tasks(days=3):
         conn.close()
 
 
-def run_agent_sync():
+def run_light_sync():
     """
-    Run full synchronization routine.
+    LLM-free sync, safe to run on every vault note save: task cleanup, vault task
+    scan/reconcile, local calendar.ics, and the tasks.md write-back.
     """
-    print("=== STARTING FULL ATHENA AGENT SYNC ===")
-
-    # 1. Process inbox files
-    process_inbox()
-
-    # 1.2. Run career job discovery & tailoring engine
-    try:
-        import job_discovery_engine
-        import job_tailor_engine
-        print("\nRunning Automated Career Job Discovery & Tailoring Engine...")
-        job_discovery_engine.run_discovery_pipeline()
-        job_tailor_engine.batch_tailor_top_leads(5)
-    except Exception as e:
-        print(f"Error running job discovery in agent sync: {e}")
-
-    # 1.5. Clean up completed tasks older than 3 days
     cleanup_old_completed_tasks(days=3)
 
-    # 2. Sync tasks from notes
     print("\nScanning vault notes for tasks...")
     scanned_tasks = scan_vault_for_tasks()
     print(f"Found {len(scanned_tasks)} tasks in vault notes. Reconciling with database...")
     reconcile_tasks_in_db(scanned_tasks)
 
-    # 3. Sync local calendar events
-
     print("\nParsing local calendar.ics...")
     sync_local_ics_to_db()
 
-    # 4. Sync Google Calendar
+    print("\nWriting back active tasks to tasks.md...")
+    sync_db_to_tasks_md_helper()
+
+def run_agent_sync():
+    """
+    Full synchronization: inbox analysis (the only step that uses the local LLM),
+    the light sync, Google Calendar, daily brief and summaries.
+    Runs on demand (POST /api/agent/run); the nightly pipeline handles the scheduled work.
+    """
+    print("=== STARTING FULL ATHENA AGENT SYNC ===")
+
+    # 1. Process inbox files (local LLM)
+    process_inbox()
+
+    # 2. Tasks, local calendar and tasks.md
+    run_light_sync()
+
+    # 3. Sync Google Calendar
     print("\nSyncing Google Calendar...")
     try:
         sync_google_calendar_to_db()
     except GoogleCalendarError as e:
         print(f"Google Calendar sync skipped: {e}")
 
-    # 5. Write back active tasks to tasks.md
-    print("\nWriting back active tasks to tasks.md...")
-    sync_db_to_tasks_md_helper()
-
-    # 6. Generate Daily Brief (for today)
+    # 4. Generate Daily Brief (for today)
     print("\nGenerating Daily Brief...")
     generate_daily_brief()
 
-    # 7. Generate Daily Summary (archive yesterday, delete old brief)
+    # 5. Generate Daily Summary (archive yesterday, delete old brief)
     print("\nGenerating Daily Summary for yesterday...")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     generate_daily_summary(target_date=yesterday)
 
-    # 8. Generate Summaries
+    # 6. Generate Summaries
     print("\nRegenerating summaries...")
     generate_obsidian_summaries()
 

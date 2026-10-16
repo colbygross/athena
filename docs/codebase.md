@@ -29,8 +29,12 @@ The backend is hosted in [backend/main.py](../backend/main.py). It exposes REST 
 ### 1.4. Learning & Career
 *   `GET /api/learning` — Returns CS study categories, hours, and topics registry.
 *   `POST /api/learning` — Logs completed learning concepts and sources.
-*   `GET /api/career` — Returns job applications history and application progress states.
-*   `POST /api/career` — Logs a new job application (company, role, status, URL).
+*   `GET /api/career` — Returns applications (with timelines), open leads, and status counts.
+*   `POST /api/career` — Logs a job application; repeats update the matching application (same URL, or company + role within 90 days).
+*   `GET | PUT | DELETE /api/career/applications/{id}` — Read, edit (status changes go on the timeline), or delete an application.
+*   `POST /api/career/applications/{id}/events` — Adds a timeline event (`interview`, `recruiter_contact`, `offer`, `note`, `status_change`).
+*   `POST /api/career/leads`, `POST /api/career/leads/{id}/ignore`, `POST /api/career/leads/{id}/promote` — Add, dismiss, or promote a lead to an application.
+*   Agents use the same operations through the MCP server at `/mcp`. See [mcp.md](mcp.md).
 
 ### 1.5. Tasks & Habit Checklists
 *   `GET /api/tasks` — Returns all active tasks in the system.
