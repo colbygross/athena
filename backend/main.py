@@ -1,5 +1,7 @@
 import os
 import re
+import socket
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -381,12 +383,9 @@ def get_finances(account_id: Optional[int] = None, date_range: Optional[str] = N
         accounts = [dict(row) for row in cursor.fetchall()]
         
         # Calculate Net Wealth
-        net_wealth = 0.0
-        for acc in accounts:
-            if acc['type'] in ('checking', 'savings', 'investment', 'cash'):
-                net_wealth += acc['current_balance']
-            elif acc['type'] == 'credit_card':
-                net_wealth -= acc['current_balance']
+        # Credit card balances are negative when money is owed (expenses lower them,
+        # payments raise them), so every account simply adds its balance.
+        net_wealth = sum(acc['current_balance'] for acc in accounts)
                 
         # Static budgets from backend/config/budget.json
         budgets = load_budgets()
@@ -450,6 +449,8 @@ def add_transaction(tx: TransactionCreate):
         )
         conn.commit()
         return {"status": "success", "id": cursor.lastrowid}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -606,6 +607,7 @@ def add_student_loan(loan: StudentLoanCreate):
         conn.commit()
         return {"status": "success", "id": cursor.lastrowid}
     except sqlite3.IntegrityError:
+        conn.rollback()
         raise HTTPException(status_code=400, detail="Student loan with this name already exists")
     except Exception as e:
         conn.rollback()
@@ -650,6 +652,7 @@ def update_student_loan(loan_id: int, loan_data: StudentLoanUpdate):
             
         return {"status": "success", "id": loan_id}
     except sqlite3.IntegrityError:
+        conn.rollback()
         raise HTTPException(status_code=400, detail="Student loan with this name already exists")
     except HTTPException:
         raise
@@ -763,6 +766,8 @@ def pay_recurring(recurring_id: int):
         )
         conn.commit()
         return {"status": "success", "next_due_date": next_due}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1150,12 +1155,25 @@ def delete_career_profile(profile_id: int):
     finally:
         conn.close()
 
+def is_public_http_url(url: str) -> bool:
+    """True only for http(s) URLs whose host resolves exclusively to public IPs."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        return all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+    except (ValueError, socket.gaierror, UnicodeError):
+        return False
+
 @app.post("/api/career/leads/url")
 def add_lead_by_url(data: JobLeadUrlIngest):
     from playwright.sync_api import sync_playwright
     
     url = data.url
     profile_id = data.profile_id
+    if not is_public_http_url(url):
+        raise HTTPException(status_code=400, detail="URL must be a public http(s) address")
     
     # Store path relative to parent dir
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1174,6 +1192,10 @@ def add_lead_by_url(data: JobLeadUrlIngest):
                 browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
                 context = browser.new_context()
                 
+            # Re-check every navigation so a redirect cannot reach file:// or internal hosts
+            context.route("**/*", lambda route: route.continue_()
+                          if not route.request.is_navigation_request() or is_public_http_url(route.request.url)
+                          else route.abort())
             page = context.new_page()
             page.goto(url, timeout=30000)
             page.wait_for_timeout(2000)
@@ -1308,6 +1330,8 @@ def update_job_application(app_id: int, app_data: JobApplicationUpdate):
         cursor.execute(query, tuple(params))
         conn.commit()
         return {"status": "success", "id": app_id}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1380,6 +1404,8 @@ def send_outreach_email(app_id: int):
         ))
         conn.commit()
         return {"status": "success", "message": "Email sent successfully!"}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
@@ -1668,6 +1694,8 @@ def update_task(task_id: int, task_data: TaskUpdate):
         query = f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ?"
         cursor.execute(query, tuple(params))
         conn.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1707,6 +1735,8 @@ def toggle_task(task_id: int):
             (new_status, completed_at, task_id)
         )
         conn.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1741,6 +1771,8 @@ def delete_task(task_id: int):
             
         cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         conn.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1773,6 +1805,8 @@ def add_subtask(task_id: int, subtask: SubtaskCreate):
         conn.commit()
         subtask_id = cursor.lastrowid
         return {"status": "success", "id": subtask_id}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1801,6 +1835,8 @@ def update_subtask(task_id: int, subtask_id: int, subtask: SubtaskUpdate):
             cursor.execute(f"UPDATE task_subtasks SET {', '.join(updates)} WHERE id = ? AND task_id = ?", tuple(params))
             conn.commit()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1838,6 +1874,8 @@ def add_prerequisite(task_id: int, prereq: PrerequisiteCreate):
         )
         conn.commit()
         return {"status": "success", "id": cursor.lastrowid}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -2032,6 +2070,8 @@ def delete_calendar_event(event_id: int):
 
         cursor.execute("DELETE FROM calendar_events WHERE id = ?", (event_id,))
         conn.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

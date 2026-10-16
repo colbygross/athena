@@ -354,8 +354,9 @@ def analyze_file(file_path):
 
         return json.loads(resp_text)
     except Exception as e:
-        print(f"Error during LLM analysis of {filename}: {e}. Falling back to mock data.")
-        return get_mock_analysis(filename, file_path)
+        # Never fall back to mock data here: it would be saved as real records.
+        print(f"Error during LLM analysis of {filename}: {e}. Leaving file in inbox for retry.")
+        return None
 
 def resolve_account_id(cursor, struct=None, merchant=None, desc=None):
     """
@@ -664,7 +665,14 @@ def save_data_to_db(analysis_results, relative_moved_path):
             )
         elif category == "health" and struct:
             cursor.execute(
-                "INSERT OR REPLACE INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                """INSERT INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes) VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(date) DO UPDATE SET
+                   weight_lbs = COALESCE(excluded.weight_lbs, weight_lbs),
+                   sleep_hours = COALESCE(excluded.sleep_hours, sleep_hours),
+                   mood = COALESCE(excluded.mood, mood),
+                   systolic = COALESCE(excluded.systolic, systolic),
+                   diastolic = COALESCE(excluded.diastolic, diastolic),
+                   notes = COALESCE(excluded.notes, notes)""",
                 (
                     struct.get("date") or current_date_str,
                     struct.get("weight_lbs"),
@@ -898,6 +906,16 @@ def generate_obsidian_summaries():
     conn.close()
     print("Regenerated Obsidian Vault index summaries.")
 
+def safe_basename(candidate, fallback):
+    """
+    Reduce an untrusted (LLM-suggested) filename to a bare basename so it can
+    never escape the destination directory. Falls back to the original name.
+    """
+    name = os.path.basename(str(candidate or "").replace("\\", "/")).strip()
+    if not name or name in (".", "..") or name.startswith("."):
+        name = os.path.basename(fallback)
+    return name
+
 def process_inbox():
     """
     Main loop to scan and process the inbox folder.
@@ -925,11 +943,13 @@ def process_inbox():
         
         # 1. Ask LLM to analyze the file
         analysis = analyze_file(file_path)
+        if not analysis:
+            continue
         analysis["original_name"] = filename
         
         category = analysis.get("category", "general")
         sub_folder = CATEGORIES.get(category, "03_Resources")
-        recommended_name = analysis.get("recommended_filename") or filename
+        recommended_name = safe_basename(analysis.get("recommended_filename"), filename)
         
         is_md = filename.lower().endswith('.md')
         
@@ -1187,9 +1207,13 @@ def serialize_local_events_to_ics_helper():
         print(f"Error writing to calendar.ics: {e}")
 
 def parse_local_ics():
+    """
+    Return the VEVENTs in calendar.ics, or None if the file is missing or unreadable.
+    None means "unknown", so callers must not treat it as "no events".
+    """
     ics_path = os.path.join(VAULT_DIR, "calendar.ics")
     if not os.path.exists(ics_path):
-        return []
+        return None
         
     events = []
     try:
@@ -1225,17 +1249,28 @@ def parse_local_ics():
                 })
     except Exception as e:
         print(f"Error parsing local ICS: {e}")
+        return None
         
     return events
 
 def sync_local_ics_to_db():
     local_events = parse_local_ics()
+    if local_events is None:
+        # Missing or unparseable file: skip the sync rather than deleting every local event.
+        return
+    ics_path = os.path.join(VAULT_DIR, "calendar.ics")
+    # created_at is UTC (CURRENT_TIMESTAMP); events created after the file was last written
+    # are not in it yet, so they must not be treated as removed.
+    ics_written_at = datetime.utcfromtimestamp(os.path.getmtime(ics_path)).strftime("%Y-%m-%d %H:%M:%S")
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT event_uid FROM calendar_events WHERE source = 'local_ics'")
+        cursor.execute(
+            "SELECT event_uid FROM calendar_events WHERE source = 'local_ics' AND (created_at IS NULL OR created_at < ?)",
+            (ics_written_at,)
+        )
         existing_uids = set([row['event_uid'] for row in cursor.fetchall()])
         
         parsed_uids = set([ev['event_uid'] for ev in local_events])
@@ -2282,29 +2317,17 @@ def cleanup_old_completed_tasks(days=3):
         tasks_by_file = {}
         for task in old_tasks:
             src_file = task['source_file']
-            if src_file:
-                if src_file not in tasks_by_file:
-                    tasks_by_file[src_file] = []
-                tasks_by_file[src_file].append(task['title'])
-            else:
-                # Task has no source file (created in DB directly), just delete from DB
-                cursor.execute("DELETE FROM tasks WHERE id = ?", (task['id'],))
-                
-        # Regex and patterns for task matching
-        task_pattern = re.compile(r'^\s*-\s*\[([xX])\]\s*(.+)$')
-        due_date_pattern = re.compile(r'📅\s*(\d{4}-\d{2}-\d{2})')
-        importance_pattern = re.compile(r'#major\b|#minor\b', re.IGNORECASE)
-        priority_pattern = re.compile(r'#high\b|#p1\b|#medium\b|#p2\b|#low\b|#p3\b', re.IGNORECASE)
-
-        for src_file, titles in tasks_by_file.items():
             if not src_file or src_file == "tasks.md":
-                # Clean up from DB (since they don't reside in human-authored files)
-                for title in titles:
-                    cursor.execute("DELETE FROM tasks WHERE (source_file IS NULL OR source_file = '' OR source_file = 'tasks.md') AND title = ?", (title,))
+                # DB-only / tasks.md task: delete exactly this completed row
+                cursor.execute("DELETE FROM tasks WHERE id = ?", (task['id'],))
             else:
-                # For human-authored files, we preserve completed tasks to keep history
-                # of both note content and database telemetry records.
-                print(f"Preserving completed task in human-authored file: {src_file}")
+                tasks_by_file.setdefault(src_file, []).append(task['title'])
+
+
+        for src_file in tasks_by_file:
+            # For human-authored files, we preserve completed tasks to keep history
+            # of both note content and database telemetry records.
+            print(f"Preserving completed task in human-authored file: {src_file}")
                 
         conn.commit()
     except Exception as e:
