@@ -778,7 +778,6 @@ function App() {
         {activeTab === 'career' && (
           <CareerTab
             careerData={careerData}
-            handleFormSubmit={handleFormSubmit}
             renderRelatedAreas={renderRelatedAreas}
             showToast={showToast}
           />
