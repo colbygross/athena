@@ -6,12 +6,6 @@ The Athena OS dashboard is a React single-page application bundled with **Vite**
 
 ## 1. Development & Staging Execution
 
-### Inside Docker (Recommended Workflow)
-When running via the staging environment (`docker-compose.dev.yml`), Vite is hosted inside `athena-frontend-dev` with live bind-mounts:
-* **URL**: `http://localhost:5174` (or `http://<your-host-ip>:5174`)
-* **API Target**: Automatically points to the staging backend API on port `8001`.
-* **Hot Module Replacement (HMR)**: Edits inside `src/` are hot-swapped into the active browser session in milliseconds without full page reloads or container rebuilds.
-
 ### Standalone Local Execution (Without Docker)
 ```bash
 cd frontend
@@ -24,11 +18,10 @@ npm run dev
 
 ## 2. Dynamic API Resolution
 
-The frontend dynamically detects its runtime environment via `API_BASE` in `src/App.jsx`:
-1. **Staging Container (Port 5174)**: Routes API requests to `http://<host>:8001/api`.
-2. **Local Dev (Port 5173)**: Routes API requests to `http://<host>:8000/api`.
-3. **Production Container (Port 8000)**: Uses relative path `${window.location.origin}/api` directly served by FastAPI.
-4. **Environment Override**: Respects `import.meta.env.VITE_API_URL` when provided.
+`API_BASE` lives in `src/api.js`:
+1. **Local Dev (Port 5173)**: Routes API requests to `http://<host>:8000/api`.
+2. **Production Container (Port 8000)**: Uses `${window.location.origin}/api`, served by FastAPI. The production image builds with an empty `VITE_API_URL`.
+3. **Environment Override**: Respects `import.meta.env.VITE_API_URL` when provided (local dev only).
 
 ---
 

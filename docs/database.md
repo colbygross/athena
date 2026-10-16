@@ -2,7 +2,7 @@
 
 Athena OS uses an **SQLite database** as its primary structured storage layer. It is configured to run with strict relational integrity, enforcing foreign key relationships and checking fields using constraint validations.
 
-*   **Database Path**: [backend/life_dashboard.db](../backend/life_dashboard.db)
+*   **Database Path**: `storage/life_dashboard.db` (override with `DB_PATH`)
 *   **Initialization Source**: [backend/database.py](../backend/database.py)
 
 ---

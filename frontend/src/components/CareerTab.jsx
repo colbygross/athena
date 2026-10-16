@@ -1,13 +1,6 @@
 import { useState, useCallback } from 'react';
 import { activateOnKey, useDialog } from '../a11y';
-
-const API_BASE = import.meta.env.VITE_API_URL || (
-  window.location.port === '5174'
-    ? `http://${window.location.hostname}:8001/api`
-    : window.location.port === '5173'
-      ? `http://${window.location.hostname}:8000/api`
-      : `${window.location.origin}/api`
-);
+import { API_BASE } from '../api';
 
 const STATUSES = [
   { id: 'applied', label: 'Applied' },

@@ -6,6 +6,10 @@ venv
 **/.pytest_cache
 frontend/node_modules
 frontend/dist
-backend/life_dashboard_staging.db*
+**/*.db
+**/*.db-shm
+**/*.db-wal
+frontend/.env*
+.env
 backend/backups
 *.log

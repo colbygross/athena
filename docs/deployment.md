@@ -1,49 +1,32 @@
 # Deployment & Containerization Architecture
 
-ATHENA is engineered for dual-environment containerization: **Development / Staging** with hot reloading and **Production** with optimized static compilation.
+Athena runs as **one production container** (`athena-prod`, port `8000`) on archer, deployed only through GitHub: push or merge to `main` → CI runs the tests and frontend build → the self-hosted runner on archer runs [`scripts/deploy.sh`](../scripts/deploy.sh).
+
+There is no staging or dev stack on archer. Develop locally (see the README) and ship through a PR.
 
 ---
 
-## 1. Quick Reference
+## 1. How a deploy works
 
-| Feature | Staging / Dev (`docker-compose.dev.yml`) | Production (`docker-compose.yml`) |
+1. The CI `deploy` job syncs `/home/archer/ATHENA` to `origin/main`, then runs `scripts/deploy.sh`.
+2. `deploy.sh` runs `docker compose up -d --build --remove-orphans`. This rebuilds the image, so dependency changes are always installed, and it removes any stray container in the `athena` compose project.
+3. It waits for `/openapi.json` and `/` to answer. If they don't within 90s, it prints the logs and **fails the job**.
+
+What lives where:
+
+| Thing | Location | Notes |
 | :--- | :--- | :--- |
-| **Purpose** | Rapid feature development & iteration | High-efficiency 24/7 background telemetry |
-| **Ports** | `8001` (API), `5174` (Frontend UI) | `8000` (Unified UI + API) |
-| **Database** | `backend/life_dashboard_staging.db` | `backend/life_dashboard.db` (Persistent) |
-| **Code Changes** | **Instant hot-reload** (Uvicorn reload + Vite HMR) | Pre-compiled static assets in image |
-| **Rebuild Needed?** | **Never** during coding | Only when updating dependencies/releases |
+| Code + frontend bundle | Inside the image only | Never bind-mounted, so code and installed packages always match |
+| Database | `storage/life_dashboard.db` (`/app/storage` in the container) | The only Athena database |
+| Google tokens, MCP data, backups | `storage/` | Persistent |
+| Obsidian vault | `obsidian_vault/` | Persistent |
+| Nightly pipeline | archer crontab: `docker exec athena-prod python3 /app/backend/run_nightly.py` at 23:59 | |
+
+The production bundle is built with an empty `VITE_API_URL`, so the UI always calls its own origin (`/api`).
 
 ---
 
-## 2. Staging / Development Environment (Zero-Rebuild Workflow)
-
-Standard Docker setups copy code at build time (`COPY . /app`), necessitating slow container rebuilds on every code change. ATHENA eliminates this overhead using a zero-rebuild architecture:
-
-1. **Live Host Bind-Mounts**:
-   * `./backend` is mounted directly into `/app/backend`.
-   * `./frontend` is mounted directly into `/app/frontend`.
-2. **Backend Reloader**:
-   * Uvicorn runs with `--reload --reload-dir backend` using `WatchFiles`. Any Python file edit restarts the server in under **500 ms**.
-3. **Frontend Vite HMR**:
-   * The container exposes Vite's development server. Edits in `frontend/src/` are hot-swapped into the browser session via WebSockets in **~50 ms** without refreshing the page.
-
-### Launch Commands
-```bash
-# Start development environment
-docker compose -f docker-compose.dev.yml up -d
-
-# Inspect live logs
-docker logs -f athena-backend-dev
-docker logs -f athena-frontend-dev
-
-# Tear down development environment
-docker compose -f docker-compose.dev.yml down
-```
-
----
-
-## 3. Production Environment
+## 2. Production Environment
 
 ### Multi-Stage Dockerfile
 The production container utilizes an efficient multi-stage build:
@@ -56,12 +39,12 @@ The production container utilizes an efficient multi-stage build:
 docker compose up -d
 
 # Check production health
-curl -f http://localhost:8000/api/vitals/stats
+curl -f http://localhost:8000/openapi.json
 ```
 
 ### Persistent Data Volumes
 Production safely mounts host directories to guarantee state persistence across container restarts:
-* `backend/life_dashboard.db` (SQLite database with WAL mode enabled)
+* `storage/life_dashboard.db` (SQLite database with WAL mode enabled)
 * `obsidian_vault/` (Notes, tasks, calendar ICS, daily briefs)
 * `storage/` (Processed PDFs, receipts, document archives)
 
