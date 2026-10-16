@@ -300,9 +300,19 @@ def _ollama_generate(prompt, image_data=None, model=None):
             time.sleep(sleep_time)
 
 
+class InboxAnalysisError(Exception):
+    """LLM analysis of an inbox file failed. retryable=True when Ollama itself was unreachable."""
+    def __init__(self, message, retryable):
+        super().__init__(message)
+        self.retryable = retryable
+
+# Inbox subfolder for files the LLM could not turn into valid JSON. Move a file back to retry it.
+INBOX_FAILED_DIRNAME = "Failed"
+
 def analyze_file(file_path):
     """
-    Call local Ollama LLM to analyze file content, or fall back to mock data.
+    Call local Ollama LLM to analyze file content (mock data only when LLM_ENABLED is false).
+    Raises InboxAnalysisError on failure; it never falls back to mock data, which would be saved as real records.
     """
     filename = os.path.basename(file_path)
     if not LLM_ENABLED:
@@ -352,11 +362,15 @@ def analyze_file(file_path):
             if resp_text.startswith("json"):
                 resp_text = resp_text[4:].strip()
 
-        return json.loads(resp_text)
+        analysis = json.loads(resp_text)
+        if not isinstance(analysis, dict):
+            raise ValueError("LLM response is not a JSON object")
+        return analysis
+    except RuntimeError as e:
+        # _ollama_generate exhausted its retries: Ollama is down, so the file may succeed later.
+        raise InboxAnalysisError(f"Ollama unavailable: {e}", retryable=True) from e
     except Exception as e:
-        # Never fall back to mock data here: it would be saved as real records.
-        print(f"Error during LLM analysis of {filename}: {e}. Leaving file in inbox for retry.")
-        return None
+        raise InboxAnalysisError(f"Could not analyze {filename}: {e}", retryable=False) from e
 
 def resolve_account_id(cursor, struct=None, merchant=None, desc=None):
     """
@@ -942,8 +956,20 @@ def process_inbox():
         print(f"\nProcessing: {filename}")
         
         # 1. Ask LLM to analyze the file
-        analysis = analyze_file(file_path)
-        if not analysis:
+        try:
+            analysis = analyze_file(file_path)
+        except InboxAnalysisError as e:
+            if e.retryable:
+                print(f"{e}. Leaving {filename} in inbox for the next run.")
+            else:
+                failed_dir = os.path.join(INBOX_DIR, INBOX_FAILED_DIRNAME)
+                os.makedirs(failed_dir, exist_ok=True)
+                failed_path = os.path.join(failed_dir, filename)
+                if os.path.exists(failed_path):
+                    base, ext = os.path.splitext(filename)
+                    failed_path = os.path.join(failed_dir, f"{base}_{int(datetime.now().timestamp())}{ext}")
+                shutil.move(file_path, failed_path)
+                print(f"{e}. Moved to {failed_path}; move it back to the inbox to retry.")
             continue
         analysis["original_name"] = filename
         
@@ -1105,51 +1131,22 @@ def sync_db_to_tasks_md_helper():
         "This file is synced automatically with your Athena OS Dashboard.\n"
     ]
     
-    for cat in ["finances", "health", "fitness", "learning", "career", "general"]:
-        tasks_in_cat = categories_tasks.get(cat, [])
-        if not tasks_in_cat:
-            continue
-            
+    # Known categories first in a fixed order, then any custom ones in first-seen order.
+    known_order = ["finances", "health", "fitness", "learning", "career", "general"]
+    ordered_cats = [c for c in known_order if c in categories_tasks]
+    ordered_cats += [c for c in categories_tasks if c not in known_order]
+
+    for cat in ordered_cats:
         content.append(f"\n## {cat.capitalize()}")
-        for t in tasks_in_cat:
+        for t in categories_tasks[cat]:
             checkbox = "- [ ]" if t['status'] == 'pending' else "- [x]"
             tags = []
             importance = t['importance'] or 'minor'
             priority = t['priority'] or 'medium'
-            if importance == 'major':
-                tags.append('#major')
-            elif importance == 'minor':
-                tags.append('#minor')
-            if priority == 'high':
-                tags.append('#high')
-            elif priority == 'medium':
-                tags.append('#medium')
-            elif priority == 'low':
-                tags.append('#low')
-            tag_str = " " + " ".join(tags) if tags else ""
-            due_str = f" 📅 {t['due_date']}" if t['due_date'] else ""
-            content.append(f"{checkbox} {t['title']}{tag_str}{due_str}")
-            
-    # Remaining categories
-    for cat, tasks_in_cat in categories_tasks.items():
-        if cat in ["finances", "health", "fitness", "learning", "career", "general"]:
-            continue
-        content.append(f"\n## {cat.capitalize()}")
-        for t in tasks_in_cat:
-            checkbox = "- [ ]" if t['status'] == 'pending' else "- [x]"
-            tags = []
-            importance = t['importance'] or 'minor'
-            priority = t['priority'] or 'medium'
-            if importance == 'major':
-                tags.append('#major')
-            elif importance == 'minor':
-                tags.append('#minor')
-            if priority == 'high':
-                tags.append('#high')
-            elif priority == 'medium':
-                tags.append('#medium')
-            elif priority == 'low':
-                tags.append('#low')
+            if importance in ('major', 'minor'):
+                tags.append(f"#{importance}")
+            if priority in ('high', 'medium', 'low'):
+                tags.append(f"#{priority}")
             tag_str = " " + " ".join(tags) if tags else ""
             due_str = f" 📅 {t['due_date']}" if t['due_date'] else ""
             content.append(f"{checkbox} {t['title']}{tag_str}{due_str}")
@@ -1568,6 +1565,10 @@ def push_pending_events():
         raise
     finally:
         conn.close()
+    if pushed_uids:
+        # Pushed rows are no longer local_ics; rewrite calendar.ics so their old '@local'
+        # UIDs are not re-imported as duplicates by the next sync_local_ics_to_db.
+        serialize_local_events_to_ics_helper()
     return pushed_uids
 
 def sync_google_calendar_to_db():

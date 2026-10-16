@@ -1602,7 +1602,6 @@ def add_task(task: TaskCreate):
                 task.event_id
             )
         )
-        conn.commit()
         task_id = cursor.lastrowid
 
         # Insert subtasks if provided
@@ -1620,11 +1619,18 @@ def add_task(task: TaskCreate):
                 p_type = p.get('prerequisite_type') or p.get('type')
                 p_id = p.get('prerequisite_id') or p.get('id')
                 if p_type and p_id:
+                    try:
+                        p_id = int(p_id)
+                    except (TypeError, ValueError):
+                        raise HTTPException(status_code=400, detail=f"Invalid prerequisite id: {p_id!r}")
                     cursor.execute(
                         "INSERT OR IGNORE INTO task_prerequisites (task_id, prerequisite_type, prerequisite_id) VALUES (?, ?, ?)",
-                        (task_id, p_type, int(p_id))
+                        (task_id, p_type, p_id)
                     )
         conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
