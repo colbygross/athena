@@ -66,6 +66,13 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # Update the checkout first so the deploy script that runs is the one from this commit.
+      - name: Sync Production Checkout
+        run: |
+          git -C /home/archer/ATHENA fetch origin main
+          git -C /home/archer/ATHENA checkout -q -f main
+          git -C /home/archer/ATHENA reset --hard origin/main
+
       - name: Run Production Deployment Script
         run: /home/archer/ATHENA/scripts/deploy.sh
 

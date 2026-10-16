@@ -1,3 +1,5 @@
+name: athena
+
 services:
   athena:
     container_name: athena-prod
@@ -7,15 +9,15 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    # Code and the frontend bundle come only from the image built by scripts/deploy.sh.
+    # Only data is mounted: the vault and storage/ (which holds the database).
     volumes:
-      - ./backend:/app/backend
-      - ./frontend/dist:/app/frontend/dist
       - ./obsidian_vault:/app/obsidian_vault
       - ./storage:/app/storage
     environment:
       - TZ=${TZ:-America/New_York}
       - PYTHONPATH=/app/backend
-      - DB_PATH=/app/backend/life_dashboard.db
+      - DB_PATH=/app/storage/life_dashboard.db
       - WORKSPACE_DIR=/app
       - PYTHONUNBUFFERED=1
       - LLM_ENABLED=${LLM_ENABLED:-false}

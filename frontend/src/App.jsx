@@ -16,14 +16,8 @@ import InboxTab from './components/InboxTab';
 import ProjectsTab from './components/ProjectsTab';
 import ResourcesTab from './components/ResourcesTab';
 import AreasTab from './components/AreasTab';
+import { API_BASE } from './api';
 
-const API_BASE = import.meta.env.VITE_API_URL || (
-  window.location.port === '5174'
-    ? `http://${window.location.hostname}:8001/api`
-    : window.location.port === '5173'
-      ? `http://${window.location.hostname}:8000/api`
-      : `${window.location.origin}/api`
-);
 
 // Global fetch interceptor to inject X-API-Key from localStorage
 const originalFetch = window.fetch;

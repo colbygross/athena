@@ -128,21 +128,16 @@ The system is automated by four Python scripts executed periodically by system s
 
 ## 5. Environment Configuration & Container Service Layers
 
-Athena supports decoupled environment routing allowing live hot-reloading in staging while maintaining a persistent production stack.
+Athena runs as a single production container on archer, deployed by CI from `main` (see [deployment.md](deployment.md)).
 
 ### 5.1. Runtime Environment Variables
-The application dynamically adapts to its execution environment via:
-* `DB_PATH`: Location of the SQLite database. Defaults to `backend/life_dashboard.db` in production and `backend/life_dashboard_staging.db` in staging.
+* `DB_PATH`: Location of the SQLite database. Defaults to `$STORAGE_DIR/life_dashboard.db`.
 * `WORKSPACE_DIR`: Base directory for storage and vault paths.
 * `VAULT_DIR`: Custom path to the Obsidian Vault (defaults to `$WORKSPACE_DIR/obsidian_vault`).
 * `STORAGE_DIR`: Custom path to flat storage assets (defaults to `$WORKSPACE_DIR/storage`).
-* `VITE_API_URL`: (Frontend) Explicit override for API endpoint URL.
+* `VITE_API_URL`: (Frontend, local dev only) Explicit API URL. Production builds leave it empty.
 
 ### 5.2. Service Architecture
-* **Staging Service ([docker-compose.dev.yml](../docker-compose.dev.yml))**:
-  * `athena-backend-dev` (Port 8001): Runs Uvicorn with `--reload` against bind-mounted code.
-  * `athena-frontend-dev` (Port 5174): Runs Vite dev server with WebSocket HMR.
-  * Requires zero container rebuilds on code modifications.
 * **Production Service ([Dockerfile](../Dockerfile) & `docker-compose.yml`)**:
-  * `athena-prod` (Port 8000): Unified container serving both API and compiled `frontend/dist` static assets.
+  * `athena-prod` (Port 8000): Unified container serving both the API and the compiled frontend from the image. Only `storage/` and the vault are mounted.
   * Managed via Dockge .

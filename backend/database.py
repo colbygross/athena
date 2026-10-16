@@ -5,9 +5,10 @@ from datetime import datetime
 
 from contextvars import ContextVar
 
-DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "life_dashboard.db"))
 _WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 STORAGE_DIR = os.getenv("STORAGE_DIR", os.path.join(_WORKSPACE_DIR, "storage"))
+# The one Athena database. It lives in storage/ (the persistent volume in Docker), never in the code tree.
+DB_PATH = os.getenv("DB_PATH", os.path.join(STORAGE_DIR, "life_dashboard.db"))
 
 class ManagedConnection(sqlite3.Connection):
     def __init__(self, *args, **kwargs):

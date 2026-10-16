@@ -12,7 +12,7 @@ Athena OS is an integrated personal telemetry system designed as a shared digita
 graph TD
     User([User]) <-->|Interacts| UI[Vite + React Dashboard]
     UI <-->|REST API| BE[FastAPI Backend]
-    BE <-->|SQLite Read/Write| DB[(SQLite: backend/life_dashboard.db)]
+    BE <-->|SQLite Read/Write| DB[(SQLite: storage/life_dashboard.db)]
     BE <-->|Read/Write Markdown| Vault[Obsidian Vault]
     BE <-->|Executes Sync Daemon| SyncAgent[Agent Sync Daemon]
     
@@ -66,9 +66,7 @@ ATHENA/
 │   ├── vite.config.js          # Vite compilation configurations
 │   └── package.json            # Client dependencies and npm script hooks
 ├── Dockerfile                  # Multi-stage production container
-├── Dockerfile.dev              # Development container with hot-reload dependencies
-├── docker-compose.yml          # 1-Command production compose stack
-├── docker-compose.dev.yml      # Development compose environment with live reload
+├── docker-compose.yml          # Production compose stack (deployed by CI via scripts/deploy.sh)
 ├── obsidian_vault/             # Obsidian knowledge base structure
 ├── skills/                     # Agentic automation skills & CLI tools
 └── storage/                    # Processed digital document repository

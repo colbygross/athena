@@ -152,17 +152,6 @@ Run the unified launch script from the project root:
 
 ---
 
-### Option 3: Development Environment with Hot-Reloading
-
-For live code iteration with containerized dependencies:
-```bash
-docker compose -f docker-compose.dev.yml up -d
-```
-* **Frontend (Vite HMR)**: `http://localhost:5174`
-* **Backend (Uvicorn WatchFiles)**: `http://localhost:8001`
-
----
-
 ## 🤖 Local LLM Ingestion Configuration
 
 Athena OS natively supports local AI processing using [Ollama](https://ollama.com):
