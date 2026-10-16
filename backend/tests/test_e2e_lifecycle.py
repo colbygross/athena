@@ -12,8 +12,6 @@ from fastapi.testclient import TestClient
 import main
 import database
 import agent
-import job_tailor_engine
-import career_agent
 
 client = TestClient(main.app)
 
@@ -210,57 +208,40 @@ def test_biometrics_and_habits_lifecycle():
     assert ov_data["weekly_workouts"] >= 1
     assert len(ov_data["todays_habits"]) >= 1
 
-def test_career_pipeline_end_to_end(monkeypatch):
+def test_career_pipeline_end_to_end():
     """
-    Test Career Engine E2E:
-    1. Create career search profile.
-    2. Add job lead.
-    3. Mock LLM and tailor lead.
-    4. Verify application packet created and status kanban updated.
+    Career pipeline E2E:
+    1. Add a lead.
+    2. Promote it to an application.
+    3. Move it through statuses and add an interview event.
+    4. Verify the board payload, timeline and stats.
     """
-    # 1. Create profile
-    res_prof = client.post("/api/career/profiles", json={
-        "name": "Applied AI Engineer",
-        "keywords": "FastAPI, Docker, LLM, Python",
-        "locations": "Remote",
-        "active": 1
+    res_lead = client.post("/api/career/leads", json={
+        "company": "OpenAI",
+        "role": "Platform Infrastructure Engineer",
+        "job_url": "https://openai.com/careers/lead-999",
+        "location": "San Francisco / Remote",
+        "salary_range": "$180k - $240k",
     })
-    assert res_prof.status_code == 200
-    profile_id = res_prof.json()["id"]
+    assert res_lead.status_code == 200
+    lead_id = res_lead.json()["id"]
 
-    # 2. Insert job lead
-    conn = database.get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO job_leads (date_found, company, role, location, salary_range, job_description, job_url, source, status, profile_id)
-        VALUES ('2026-06-05', 'OpenAI', 'Platform Infrastructure Engineer', 'San Francisco / Remote', '$180k - $240k', 'Build resilient backend systems.', 'https://openai.com/careers/lead-999', 'greenhouse', 'lead', ?)
-    """, (profile_id,))
-    conn.commit()
-    lead_id = cursor.lastrowid
-    conn.close()
+    res_promote = client.post(f"/api/career/leads/{lead_id}/promote", json={"date_applied": "2026-06-05"})
+    assert res_promote.status_code == 200
+    app_id = res_promote.json()["id"]
 
-    # 3. Mock LLM for tailoring
-    mock_packet = {
-        "match_score": 92,
-        "recruiter_name": "Sam Altman",
-        "recruiter_email": "sam@openai.com",
-        "tailored_bullets": "- Architected high-throughput FastAPI microservices\n- Containerized dual dev/prod environments\n- Automated agentic ingestion with local models",
-        "cover_letter": "I am eager to contribute to OpenAI infrastructure.",
-        "cold_email_draft": "Hi Sam, I build reliable platform systems and would love to chat."
-    }
-    monkeypatch.setattr(job_tailor_engine, "call_llm", lambda prompt: json.dumps(mock_packet))
+    assert client.put(f"/api/career/applications/{app_id}", json={"status": "interviewing"}).status_code == 200
+    res_event = client.post(f"/api/career/applications/{app_id}/events", json={
+        "kind": "interview", "note": "System design round", "event_date": "2026-06-12"
+    })
+    assert res_event.status_code == 200
 
-    # Process & tailor lead
-    res_proc = client.post(f"/api/career/leads/{lead_id}/process")
-    assert res_proc.status_code == 200
-    app_id = res_proc.json()["application_id"]
-
-    # 4. Verify in /api/career
-    res_career = client.get("/api/career")
-    assert res_career.status_code == 200
-    apps = res_career.json()["applications"]
-    app = next(a for a in apps if a["id"] == app_id)
+    data = client.get("/api/career").json()
+    app = next(a for a in data["applications"] if a["id"] == app_id)
     assert app["company"] == "OpenAI"
-    assert app["recruiter_name"] == "Sam Altman"
-    assert app["recruiter_email"] == "sam@openai.com"
-    assert "FastAPI" in app["tailored_bullets"]
+    assert app["lead_id"] == lead_id
+    assert app["status"] == "interviewing"
+    # Timeline is ordered by event date: logged (Jun 5), interview (Jun 12), status change (today)
+    assert [e["kind"] for e in app["events"]] == ["status_change", "interview", "status_change"]
+    assert data["leads"] == []  # promoted lead is no longer open
+    assert data["stats"]["by_status"]["interviewing"] == 1

@@ -39,7 +39,7 @@
 | **Financial Ledger** | Double-entry transaction accounting, monthly category budget limits, and recurring bill trackers. |
 | **Multi-Modal Ingestion** | Local vision models (Qwen-VL) and LLMs (Phi-4) extract JSON from PDFs and receipts into SQLite. |
 | **Biometric & Habits** | Blood pressure, sleep architecture, resting telemetry, and recurring habit streaks. |
-| **Career Pipeline** | Automated job discovery scanner, application status kanban, and AI resume tailoring. |
+| **Career Pipeline** | Application pipeline, timelines, and leads, fed by your agents through the [MCP server](docs/mcp.md). |
 
 ---
 
@@ -202,7 +202,7 @@ Athena contains 14 relational tables managed with explicit indexing and cascade 
 | `habit_logs` | Recurring micro-habit checklist | `id` PK, `UNIQUE(date, habit_name)` |
 | `tasks` | Master task registry | `id` PK, `status` CHECK, `priority`, `category` |
 | `learning_progress` | CS topic study logs | `id` PK, `topic`, `hours_spent`, `status` CHECK |
-| `job_applications` | Career outreach pipeline | `id` PK, `company`, `role`, `status` CHECK |
+| `job_applications` | Job applications (plus `application_events` timeline, `job_leads`) | `id` PK, `company`, `role`, `status` CHECK |
 | `calendar_events` | Unified schedule aggregator | `id` PK, `start_time`, `end_time`, `event_uid` UNIQUE |
 
 ### Interactive Command-Line Tool

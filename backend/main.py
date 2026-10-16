@@ -1,9 +1,9 @@
 import os
 import re
-import socket
 import sqlite3
 import threading
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -17,9 +17,9 @@ from icalendar import Calendar, Event
 
 from database import get_db_connection, init_db, _db_conn_var, create_new_connection
 import agent
-import career_agent
-import job_discovery_engine
-import job_tailor_engine
+import career
+import finance
+import mcp_server
 
 
 # Initialize DB on startup
@@ -29,7 +29,18 @@ try:
 except Exception as e:
     print(f"Error syncing local ICS on startup: {e}")
 
-app = FastAPI(title="Life Organizer Dashboard API")
+@asynccontextmanager
+async def lifespan(app):
+    # The MCP server's session manager must run for as long as the app does.
+    async with mcp_server.lifespan():
+        yield
+
+app = FastAPI(title="Life Organizer Dashboard API", lifespan=lifespan)
+
+# MCP endpoint for external agents (bearer-token auth, see mcp_server.py). Registered before
+# the static-file catch-all so GET /mcp is not served as a frontend file.
+for _mcp_path in ("/mcp", "/mcp/"):
+    app.router.add_route(_mcp_path, mcp_server.endpoint, methods=["GET", "POST", "DELETE"], include_in_schema=False)
 
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next):
@@ -185,34 +196,45 @@ class LearningProgressCreate(BaseModel):
     status: str = "completed"
 
 class JobApplicationCreate(BaseModel):
-    date_applied: str
     company: str
     role: str
+    date_applied: Optional[str] = None
+    status: Optional[str] = None
     salary_range: Optional[str] = None
-    status: str = "applied"
     job_description_url: Optional[str] = None
     notes: Optional[str] = None
-
-class JobApplicationUpdate(BaseModel):
     recruiter_name: Optional[str] = None
     recruiter_email: Optional[str] = None
-    cold_email_draft: Optional[str] = None
-    tailored_bullets: Optional[str] = None
-    cover_letter: Optional[str] = None
+
+class JobApplicationUpdate(BaseModel):
+    company: Optional[str] = None
+    role: Optional[str] = None
+    date_applied: Optional[str] = None
     status: Optional[str] = None
+    salary_range: Optional[str] = None
+    job_description_url: Optional[str] = None
+    notes: Optional[str] = None
+    recruiter_name: Optional[str] = None
+    recruiter_email: Optional[str] = None
 
-class CareerProfileCreate(BaseModel):
-    name: str
-    resume_path: Optional[str] = None
-    keywords: str
-    locations: str
-    active: Optional[int] = 1
+class ApplicationEventCreate(BaseModel):
+    kind: str
+    note: Optional[str] = None
+    event_date: Optional[str] = None
 
-class JobLeadUrlIngest(BaseModel):
-    url: str
-    profile_id: int
+class JobLeadCreate(BaseModel):
+    company: str
+    role: str
+    job_url: str
+    location: Optional[str] = None
+    salary_range: Optional[str] = None
+    description: Optional[str] = None
+    source: Optional[str] = "manual"
+    is_remote: Optional[bool] = False
 
-
+class LeadPromote(BaseModel):
+    date_applied: Optional[str] = None
+    notes: Optional[str] = None
 
 class HabitLogCreate(BaseModel):
     date: str
@@ -371,21 +393,10 @@ def get_finances(account_id: Optional[int] = None, date_range: Optional[str] = N
         breakdown = [dict(row) for row in cursor.fetchall()]
         
         # Fetch accounts with balances
-        cursor.execute("""
-            SELECT a.id, a.name, a.type, a.starting_balance,
-                   a.starting_balance + 
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='income'), 0) -
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='expense'), 0) -
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='transfer'), 0) +
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE transfer_account_id = a.id AND type='transfer'), 0) as current_balance
-            FROM accounts a
-        """)
-        accounts = [dict(row) for row in cursor.fetchall()]
+        accounts = finance.account_balances(cursor)
         
         # Calculate Net Wealth
-        # Credit card balances are negative when money is owed (expenses lower them,
-        # payments raise them), so every account simply adds its balance.
-        net_wealth = sum(acc['current_balance'] for acc in accounts)
+        net_wealth = finance.net_wealth(accounts)
                 
         # Static budgets from backend/config/budget.json
         budgets = load_budgets()
@@ -538,16 +549,7 @@ def get_accounts():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT a.id, a.name, a.type, a.starting_balance,
-                   a.starting_balance + 
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='income'), 0) -
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='expense'), 0) -
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type='transfer'), 0) +
-                   COALESCE((SELECT SUM(amount) FROM transactions WHERE transfer_account_id = a.id AND type='transfer'), 0) as current_balance
-            FROM accounts a
-        """)
-        return {"accounts": [dict(row) for row in cursor.fetchall()]}
+        return {"accounts": finance.account_balances(cursor)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -684,19 +686,10 @@ def delete_student_loan(loan_id: int):
 
 
 # --- BUDGETS ---
-# Static monthly budget, edited by hand in backend/config/budget.json
-BUDGET_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "budget.json")
+BUDGET_CONFIG_PATH = finance.BUDGET_CONFIG_PATH
 
 def load_budgets():
-    try:
-        with open(BUDGET_CONFIG_PATH) as f:
-            data = json.load(f)
-        return [
-            {"category": b["category"], "limit_amount": float(b["limit_amount"])}
-            for b in data.get("budgets", [])
-        ]
-    except FileNotFoundError:
-        return []
+    return finance.load_budgets(BUDGET_CONFIG_PATH)
 
 @app.get("/api/budgets")
 def get_budgets():
@@ -1067,365 +1060,75 @@ def add_learning(log: LearningProgressCreate):
         conn.close()
 
 # --- CAREER ---
-@app.get("/api/career")
-def get_career():
+# Job hunting is done by external agents (via MCP) and by hand; Athena only stores and shows it.
+def _career_call(fn, *args, **kwargs):
+    """Run a career.py function in its own transaction, mapping its errors to HTTP codes."""
     conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM job_applications ORDER BY date_applied DESC")
-        apps = [dict(row) for row in cursor.fetchall()]
-        
-        cursor.execute("SELECT * FROM job_leads WHERE status = 'lead' ORDER BY match_score DESC, tier ASC, date_found DESC")
-        leads = [dict(row) for row in cursor.fetchall()]
-        
-        cursor.execute("SELECT * FROM career_search_profiles")
-        profiles = [dict(row) for row in cursor.fetchall()]
-        
-        cursor.execute("SELECT COUNT(*) FROM job_leads WHERE is_remote = 1")
-        tier1_count = cursor.fetchone()[0] or 0
-
-        cursor.execute("SELECT COUNT(*) FROM job_leads WHERE tier = 2")
-        tier2_count = cursor.fetchone()[0] or 0
-
-        cursor.execute("SELECT COUNT(*) FROM job_applications WHERE outreach_status = 'pending'")
-        pending_outreach = cursor.fetchone()[0] or 0
-        
-        return {
-            "applications": apps, 
-            "leads": leads, 
-            "profiles": profiles,
-            "stats": {
-                "total_leads": len(leads),
-                "total_applications": len(apps),
-                "tier1_count": tier1_count,
-                "tier2_count": tier2_count,
-                "pending_outreach": pending_outreach
-            }
-        }
+        result = fn(conn, *args, **kwargs)
+        conn.commit()
+        return result
+    except career.CareerNotFound as e:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+    except career.CareerError as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+def _career_snapshot(conn):
+    return {
+        "applications": career.list_applications(conn, include_events=True),
+        "leads": career.list_leads(conn),
+        "stats": career.career_stats(conn),
+    }
+
+@app.get("/api/career")
+def get_career():
+    return _career_call(_career_snapshot)
 
 @app.post("/api/career")
 def add_career(app_data: JobApplicationCreate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO job_applications (date_applied, company, role, salary_range, status, job_description_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (app_data.date_applied, app_data.company, app_data.role, app_data.salary_range, app_data.status, app_data.job_description_url, app_data.notes)
-        )
-        conn.commit()
-        return {"status": "success", "id": cursor.lastrowid}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    data = app_data.model_dump()
+    data["job_url"] = data.pop("job_description_url")
+    return {"status": "success", **_career_call(career.log_application, **data)}
 
-@app.post("/api/career/profiles")
-def add_career_profile(prof: CareerProfileCreate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO career_search_profiles (name, resume_path, keywords, locations, active) VALUES (?, ?, ?, ?, ?)",
-            (prof.name, prof.resume_path, prof.keywords, prof.locations, prof.active)
-        )
-        conn.commit()
-        return {"status": "success", "id": cursor.lastrowid}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.delete("/api/career/profiles/{profile_id}")
-def delete_career_profile(profile_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("DELETE FROM career_search_profiles WHERE id = ?", (profile_id,))
-        conn.commit()
-        return {"status": "success"}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-def is_public_http_url(url: str) -> bool:
-    """True only for http(s) URLs whose host resolves exclusively to public IPs."""
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return False
-        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
-        return all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
-    except (ValueError, socket.gaierror, UnicodeError):
-        return False
-
-@app.post("/api/career/leads/url")
-def add_lead_by_url(data: JobLeadUrlIngest):
-    from playwright.sync_api import sync_playwright
-    
-    url = data.url
-    profile_id = data.profile_id
-    if not is_public_http_url(url):
-        raise HTTPException(status_code=400, detail="URL must be a public http(s) address")
-    
-    # Store path relative to parent dir
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    CONTEXT_DIR = os.path.join(os.path.dirname(base_dir), "storage", "playwright_context")
-    os.makedirs(os.path.dirname(CONTEXT_DIR), exist_ok=True)
-    
-    with sync_playwright() as p:
-        try:
-            if os.path.exists(CONTEXT_DIR):
-                context = p.chromium.launch_persistent_context(
-                    user_data_dir=CONTEXT_DIR,
-                    headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox"]
-                )
-            else:
-                browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-                context = browser.new_context()
-                
-            # Re-check every navigation so a redirect cannot reach file:// or internal hosts
-            context.route("**/*", lambda route: route.continue_()
-                          if not route.request.is_navigation_request() or is_public_http_url(route.request.url)
-                          else route.abort())
-            page = context.new_page()
-            page.goto(url, timeout=30000)
-            page.wait_for_timeout(2000)
-            
-            title = page.title() or "Unknown Role"
-            company = "Unknown Company"
-            description = page.locator("body").inner_text()[:2000]
-            location = "Unknown Location"
-            source = "manual"
-            
-            # Simple domain extraction
-            parsed_domain = urlparse(url).netloc
-            if "linkedin.com" in parsed_domain:
-                source = "linkedin"
-                comp_elem = page.query_selector("span.topcard__flavor a, a.topcard__org-name-link, .job-details-company-name, .job-details-company-name a")
-                if comp_elem:
-                    company = comp_elem.inner_text().strip()
-                title_elem = page.query_selector("h1.top-card-layout__title, h1.job-details-title, h1.text-display-5")
-                if title_elem:
-                    title = title_elem.inner_text().strip()
-                desc_elem = page.query_selector("article.jobs-description__content, .jobs-box__html-content, #job-details")
-                if desc_elem:
-                    description = desc_elem.inner_text().strip()
-                loc_elem = page.query_selector(".topcard__flavor--bullet, .job-details-location")
-                if loc_elem:
-                    location = loc_elem.inner_text().strip()
-            elif "indeed.com" in parsed_domain:
-                source = "indeed"
-                comp_elem = page.query_selector("[data-testid='company-name']")
-                if comp_elem:
-                    company = comp_elem.inner_text().strip()
-                title_elem = page.query_selector("h1.jobsearch-JobInfoHeader-title")
-                if title_elem:
-                    title = title_elem.inner_text().strip()
-                desc_elem = page.query_selector("#jobDescriptionText")
-                if desc_elem:
-                    description = desc_elem.inner_text().strip()
-            elif "joinhandshake.com" in parsed_domain:
-                source = "handshake"
-                comp_elem = page.query_selector(".style__employer-name___3c_qY, .employer-name")
-                if comp_elem:
-                    company = comp_elem.inner_text().strip()
-                title_elem = page.query_selector("h1")
-                if title_elem:
-                    title = title_elem.inner_text().strip()
-                desc_elem = page.query_selector("[data-hook='job-description']")
-                if desc_elem:
-                    description = desc_elem.inner_text().strip()
-            
-            if "?" in url:
-                url = url.split("?")[0]
-                
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            today = datetime.now().strftime("%Y-%m-%d")
-            cursor.execute("""
-                INSERT INTO job_leads (date_found, company, role, location, salary_range, job_description, job_url, source, status, profile_id)
-                VALUES (?, ?, ?, ?, '', ?, ?, ?, 'lead', ?)
-            """, (today, company, title, location, description, url, source, profile_id))
-            conn.commit()
-            lead_id = cursor.lastrowid
-            conn.close()
-            return {"status": "success", "lead_id": lead_id, "title": title, "company": company}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to ingest URL: {str(e)}")
-        finally:
-            try:
-                context.close()
-            except Exception:
-                pass
-
-@app.post("/api/career/leads/{lead_id}/ignore")
-def ignore_lead(lead_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE job_leads SET status = 'ignored' WHERE id = ?", (lead_id,))
-        conn.commit()
-        return {"status": "success"}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.post("/api/career/leads/{lead_id}/process")
-@app.post("/api/career/leads/{lead_id}/approve")
-def process_lead(lead_id: int):
-    try:
-        app_id = job_tailor_engine.tailor_job_lead(lead_id)
-        return {"status": "success", "application_id": app_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/api/career/applications/{app_id}")
+def get_job_application(app_id: int):
+    return _career_call(career.get_application, app_id)
 
 @app.put("/api/career/applications/{app_id}")
 def update_job_application(app_id: int, app_data: JobApplicationUpdate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM job_applications WHERE id = ?", (app_id,))
-        app = cursor.fetchone()
-        if not app:
-            raise HTTPException(status_code=404, detail="Application not found")
-        
-        update_fields = []
-        params = []
-        
-        if app_data.recruiter_name is not None:
-            update_fields.append("recruiter_name = ?")
-            params.append(app_data.recruiter_name)
-        if app_data.recruiter_email is not None:
-            update_fields.append("recruiter_email = ?")
-            params.append(app_data.recruiter_email)
-        if app_data.cold_email_draft is not None:
-            update_fields.append("cold_email_draft = ?")
-            params.append(app_data.cold_email_draft)
-        if app_data.tailored_bullets is not None:
-            update_fields.append("tailored_bullets = ?")
-            params.append(app_data.tailored_bullets)
-        if app_data.cover_letter is not None:
-            update_fields.append("cover_letter = ?")
-            params.append(app_data.cover_letter)
-        if app_data.status is not None:
-            update_fields.append("status = ?")
-            params.append(app_data.status)
-            
-        if not update_fields:
-            return {"status": "no_change", "id": app_id}
-            
-        params.append(app_id)
-        query = f"UPDATE job_applications SET {', '.join(update_fields)} WHERE id = ?"
-        cursor.execute(query, tuple(params))
-        conn.commit()
-        return {"status": "success", "id": app_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    _career_call(career.update_application, app_id, app_data.model_dump())
+    return {"status": "success", "id": app_id}
 
+@app.delete("/api/career/applications/{app_id}")
+def delete_job_application(app_id: int):
+    _career_call(career.delete_application, app_id)
+    return {"status": "success"}
 
-@app.post("/api/career/applications/{app_id}/send-email")
-def send_outreach_email(app_id: int):
-    smtp_server = os.getenv("OUTREACH_SMTP_SERVER", "")
-    smtp_port = os.getenv("OUTREACH_SMTP_PORT", "")
-    sender_email = os.getenv("OUTREACH_EMAIL", "")
-    sender_password = os.getenv("OUTREACH_PASSWORD", "")
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM job_applications WHERE id = ?", (app_id,))
-        app = cursor.fetchone()
-        
-        if not app:
-            raise HTTPException(status_code=404, detail="Application not found")
-            
-        if not app['recruiter_email'] or not app['cold_email_draft']:
-            raise HTTPException(status_code=400, detail="Missing recruiter email or cold email draft details.")
-            
-        if not smtp_server or not sender_email or not sender_password:
-            # If SMTP is not fully configured, log the email in outreach_logs and update status to 'sent'
-            cursor.execute("""
-                INSERT INTO outreach_logs (application_id, recipient_email, subject, body, status)
-                VALUES (?, ?, ?, ?, 'staged')
-            """, (
-                app_id, app['recruiter_email'],
-                f"Inquiry regarding {app['role']} role at {app['company']} - Colby Gross",
-                app['cold_email_draft']
-            ))
-            cursor.execute("UPDATE job_applications SET outreach_status = 'sent' WHERE id = ?", (app_id,))
-            conn.commit()
-            return {"status": "success", "message": "Email draft logged and staged! (Configure SMTP in .env for direct transmission)"}
-            
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        
-        # Construct Email
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = app['recruiter_email']
-        msg['Subject'] = f"Inquiry regarding {app['role']} role at {app['company']} - Colby Gross"
-        
-        msg.attach(MIMEText(app['cold_email_draft'], 'plain'))
-        
-        # Connect to SMTP
-        port = int(smtp_port) if smtp_port else 587
-        server = smtplib.SMTP(smtp_server, port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, app['recruiter_email'], msg.as_string())
-        server.quit()
-        
-        # Update status in DB
-        cursor.execute("UPDATE job_applications SET outreach_status = 'sent' WHERE id = ?", (app_id,))
-        cursor.execute("""
-            INSERT INTO outreach_logs (application_id, recipient_email, subject, body, status)
-            VALUES (?, ?, ?, ?, 'sent')
-        """, (
-            app_id, app['recruiter_email'],
-            f"Inquiry regarding {app['role']} role at {app['company']} - Colby Gross",
-            app['cold_email_draft']
-        ))
-        conn.commit()
-        return {"status": "success", "message": "Email sent successfully!"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
-    finally:
-        conn.close()
+@app.post("/api/career/applications/{app_id}/events")
+def add_job_application_event(app_id: int, event: ApplicationEventCreate):
+    event_id = _career_call(career.add_application_event, app_id, event.kind, event.note, event.event_date)
+    return {"status": "success", "id": event_id}
 
-def run_scraper_in_background():
-    try:
-        print("Starting background job discovery & tailoring engine...")
-        added = job_discovery_engine.run_discovery_pipeline()
-        print(f"Job discovery added {added} new leads. Starting batch tailoring...")
-        tailored = job_tailor_engine.batch_tailor_top_leads(5)
-        print(f"Batch tailoring completed. Created {len(tailored)} tailored packets.")
-    except Exception as e:
-        print(f"Background discovery error: {e}")
+@app.post("/api/career/leads")
+def add_job_lead(lead: JobLeadCreate):
+    return {"status": "success", **_career_call(career.add_lead, **lead.model_dump())}
 
-@app.post("/api/career/scrape")
-def trigger_scrape(background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_scraper_in_background)
-    return {"status": "started", "message": "Job discovery engine started in background."}
+@app.post("/api/career/leads/{lead_id}/ignore")
+def ignore_lead(lead_id: int):
+    _career_call(career.dismiss_lead, lead_id)
+    return {"status": "success"}
+
+@app.post("/api/career/leads/{lead_id}/promote")
+def promote_job_lead(lead_id: int, body: Optional[LeadPromote] = None):
+    body = body or LeadPromote()
+    return {"status": "success", **_career_call(career.promote_lead, lead_id, body.date_applied, body.notes)}
 
 
 # --- HABITS ---
@@ -2214,8 +1917,10 @@ def get_calendar_gaps(date: str, day_start: str = "08:00", day_end: str = "22:00
         conn.close()
 
 # --- AGENT CONTROLLER ---
-def run_agent_in_background():
+def run_agent_in_background(sync=None):
+    """Run agent.run_agent_sync (or the given sync function) unless a run is already in progress."""
     global agent_running
+    sync = sync or agent.run_agent_sync
     with agent_lock:
         if agent_running:
             return
@@ -2227,7 +1932,7 @@ def run_agent_in_background():
         bg_conn._is_request_scoped = False
         token = _db_conn_var.set(bg_conn)
         try:
-            agent.run_agent_sync()
+            sync()
             print("Background Athena agent synchronization completed successfully.")
         finally:
             bg_conn.close()
@@ -2364,7 +2069,8 @@ def update_project(filename: str, project: ProjectUpdate, background_tasks: Back
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(project.content)
         
-        background_tasks.add_task(run_agent_in_background)
+        # Note saves only need the LLM-free sync (tasks, calendar.ics, tasks.md)
+        background_tasks.add_task(run_agent_in_background, agent.run_light_sync)
         return {"status": "success", "message": "Project updated and sync triggered."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2419,7 +2125,8 @@ def update_resource(filename: str, resource: ResourceUpdate, background_tasks: B
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(resource.content)
         
-        background_tasks.add_task(run_agent_in_background)
+        # Note saves only need the LLM-free sync (tasks, calendar.ics, tasks.md)
+        background_tasks.add_task(run_agent_in_background, agent.run_light_sync)
         return {"status": "success", "message": "Resource updated and sync triggered."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2484,7 +2191,8 @@ def update_area(category: str, filename: str, area: AreaUpdate, background_tasks
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(area.content)
         
-        background_tasks.add_task(run_agent_in_background)
+        # Note saves only need the LLM-free sync (tasks, calendar.ics, tasks.md)
+        background_tasks.add_task(run_agent_in_background, agent.run_light_sync)
         return {"status": "success", "message": "Area note updated and sync triggered."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

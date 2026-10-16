@@ -199,12 +199,6 @@ def seed_telemetry(db_path: str = None):
 
     print("[*] Seeding Career Pipelines & Job Leads...")
     # Job Leads & Applications
-    cursor.execute("""
-        INSERT OR IGNORE INTO career_search_profiles (name, keywords, locations, active)
-        VALUES ('Full-Stack & Applied AI Engineer', 'Python, FastAPI, React, AI, LLM, Docker', 'Remote, Boston, Hybrid', 1)
-    """)
-    profile_id = cursor.lastrowid or 1
-
     sample_leads = [
         ("Scale AI", "Applied AI Systems Engineer", "San Francisco, CA (Remote)", "$160k - $210k", "https://scale.com/careers/sample-ai-eng"),
         ("Linear", "Full-Stack Product Engineer", "Remote", "$150k - $190k", "https://linear.app/careers/fullstack"),
@@ -212,14 +206,25 @@ def seed_telemetry(db_path: str = None):
     ]
     for comp, role, loc, sal, url in sample_leads:
         cursor.execute("""
-            INSERT OR IGNORE INTO job_leads (date_found, company, role, location, salary_range, job_url, source, status, profile_id)
-            VALUES (?, ?, ?, ?, ?, ?, 'Discovery Engine', 'lead', ?)
-        """, ((today - timedelta(days=random.randint(1, 10))).isoformat(), comp, role, loc, sal, url, profile_id))
+            INSERT OR IGNORE INTO job_leads (date_found, company, role, location, salary_range, job_url, source, status, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, 'demo', 'lead', 'demo-agent')
+        """, ((today - timedelta(days=random.randint(1, 10))).isoformat(), comp, role, loc, sal, url))
 
     cursor.execute("""
         INSERT INTO job_applications (date_applied, company, role, salary_range, status, job_description_url, notes)
         VALUES (?, 'Anthropic Labs', 'Full-Stack Platform Engineer', '$175,000 - $225,000', 'interviewing', 'https://anthropic.com/careers', 'Technical phone screen completed; architecture system interview scheduled.')
     """, ((today - timedelta(days=8)).isoformat(),))
+    demo_app_id = cursor.lastrowid
+    for days_ago, kind, note in [
+        (8, 'status_change', 'Logged as applied'),
+        (5, 'recruiter_contact', 'Recruiter reached out to schedule a phone screen'),
+        (3, 'status_change', 'applied → interviewing: phone screen passed'),
+        (-2, 'interview', 'Architecture system interview'),
+    ]:
+        cursor.execute(
+            "INSERT INTO application_events (application_id, event_date, kind, note, created_by) VALUES (?, ?, ?, ?, 'demo-agent')",
+            (demo_app_id, (today - timedelta(days=days_ago)).isoformat(), kind, note)
+        )
 
     print("[*] Seeding Calendar Events...")
     # Calendar Events

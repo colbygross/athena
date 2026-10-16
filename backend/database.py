@@ -1,9 +1,13 @@
 import sqlite3
 import os
+import json
+from datetime import datetime
 
 from contextvars import ContextVar
 
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "life_dashboard.db"))
+_WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+STORAGE_DIR = os.getenv("STORAGE_DIR", os.path.join(_WORKSPACE_DIR, "storage"))
 
 class ManagedConnection(sqlite3.Connection):
     def __init__(self, *args, **kwargs):
@@ -40,6 +44,115 @@ def get_db_connection():
     except LookupError:
         pass
     return create_new_connection()
+
+JOB_LEADS_SQL = """
+    CREATE TABLE IF NOT EXISTS {name} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date_found TEXT NOT NULL,
+        company TEXT NOT NULL,
+        role TEXT NOT NULL,
+        location TEXT,
+        salary_range TEXT,
+        job_description TEXT,
+        job_url TEXT UNIQUE NOT NULL,
+        source TEXT NOT NULL,
+        status TEXT CHECK(status IN ('lead', 'ignored', 'applied')) DEFAULT 'lead',
+        is_remote INTEGER DEFAULT 0,
+        tier INTEGER DEFAULT 1,
+        match_score INTEGER DEFAULT 0,
+        created_by TEXT -- MCP token name, or NULL when added from the dashboard
+    );
+"""
+
+JOB_APPLICATIONS_SQL = """
+    CREATE TABLE IF NOT EXISTS {name} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date_applied TEXT NOT NULL, -- YYYY-MM-DD
+        company TEXT NOT NULL,
+        role TEXT NOT NULL,
+        salary_range TEXT,
+        status TEXT CHECK(status IN ('applied', 'interviewing', 'offered', 'rejected', 'withdrawn')) DEFAULT 'applied',
+        job_description_url TEXT,
+        notes TEXT,
+        resume_file_id INTEGER REFERENCES processed_files(id) ON DELETE SET NULL,
+        lead_id INTEGER REFERENCES job_leads(id) ON DELETE SET NULL,
+        recruiter_name TEXT,
+        recruiter_email TEXT,
+        created_by TEXT -- MCP token name, or NULL when added from the dashboard
+    );
+"""
+
+# Columns/tables from the retired job discovery, tailoring and outreach features.
+RETIRED_APPLICATION_COLUMNS = ("cold_email_draft", "outreach_status", "tailored_bullets", "cover_letter")
+RETIRED_TABLES = ("career_search_profiles", "outreach_logs")
+
+def _table_columns(cursor, table):
+    cursor.execute(f"PRAGMA table_info({table});")
+    return [row['name'] for row in cursor.fetchall()]
+
+def _table_exists(cursor, table):
+    cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?;", (table,))
+    return cursor.fetchone() is not None
+
+def _rebuild_table(conn, table, create_sql):
+    """
+    Recreate `table` with `create_sql`, copying the columns both versions share.
+    Uses SQLite's create-new/copy/drop/rename procedure so foreign keys in other
+    tables keep pointing at `table`. Caller must have committed and turned foreign keys off.
+    """
+    cursor = conn.cursor()
+    new_name = f"{table}_new"
+    cursor.execute(f"DROP TABLE IF EXISTS {new_name};")
+    cursor.execute(create_sql.format(name=new_name))
+    shared = [c for c in _table_columns(cursor, new_name) if c in set(_table_columns(cursor, table))]
+    cols = ", ".join(shared)
+    cursor.execute(f"INSERT INTO {new_name} ({cols}) SELECT {cols} FROM {table};")
+    cursor.execute(f"DROP TABLE {table};")
+    cursor.execute(f"ALTER TABLE {new_name} RENAME TO {table};")
+
+def retire_job_hunt_schema(conn):
+    """
+    One-time migration: back up and remove the job discovery/tailoring/outreach data
+    (search profiles, outreach logs, tailoring columns, job_leads.profile_id).
+    Returns the backup path, or None when there was nothing to retire.
+    """
+    cursor = conn.cursor()
+    app_cols = _table_columns(cursor, "job_applications")
+    lead_cols = _table_columns(cursor, "job_leads")
+    leads_need_rebuild = "profile_id" in lead_cols or "created_by" not in lead_cols
+    apps_need_rebuild = any(c in app_cols for c in RETIRED_APPLICATION_COLUMNS) or "created_by" not in app_cols
+    retired_tables = [t for t in RETIRED_TABLES if _table_exists(cursor, t)]
+    if not (leads_need_rebuild or apps_need_rebuild or retired_tables):
+        return None
+
+    backup = {}
+    for table in ["job_applications", "job_leads", *retired_tables]:
+        cursor.execute(f"SELECT * FROM {table};")
+        backup[table] = [dict(row) for row in cursor.fetchall()]
+    os.makedirs(STORAGE_DIR, exist_ok=True)
+    backup_path = os.path.join(STORAGE_DIR, f"career_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(backup_path, "w", encoding="utf-8") as f:
+        json.dump(backup, f, indent=2, default=str)
+    print(f"Migrating: backed up retired career data to {backup_path}")
+
+    # PRAGMA foreign_keys is ignored inside a transaction, so commit first.
+    conn.commit()
+    cursor.execute("PRAGMA foreign_keys=OFF;")
+    try:
+        if leads_need_rebuild:
+            _rebuild_table(conn, "job_leads", JOB_LEADS_SQL)
+        if apps_need_rebuild:
+            _rebuild_table(conn, "job_applications", JOB_APPLICATIONS_SQL)
+        for table in retired_tables:
+            cursor.execute(f"DROP TABLE {table};")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.execute("PRAGMA foreign_keys=ON;")
+    print("Migrating: removed job discovery, tailoring and outreach columns/tables.")
+    return backup_path
 
 def init_db():
     conn = get_db_connection()
@@ -190,56 +303,11 @@ def init_db():
     );
     """)
     
-    # 5.5. career_search_profiles table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS career_search_profiles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        resume_path TEXT,
-        keywords TEXT NOT NULL,
-        locations TEXT NOT NULL,
-        active INTEGER DEFAULT 1
-    );
-    """)
-
-    # 5.6. job_leads table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS job_leads (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date_found TEXT NOT NULL,
-        company TEXT NOT NULL,
-        role TEXT NOT NULL,
-        location TEXT,
-        salary_range TEXT,
-        job_description TEXT,
-        job_url TEXT UNIQUE NOT NULL,
-        source TEXT NOT NULL,
-        status TEXT CHECK(status IN ('lead', 'ignored', 'applied')) DEFAULT 'lead',
-        profile_id INTEGER REFERENCES career_search_profiles(id) ON DELETE CASCADE
-    );
-    """)
+    # 5.6. job_leads table (jobs worth considering, usually added by agents)
+    cursor.execute(JOB_LEADS_SQL.format(name="job_leads"))
     
-    # 6. job_applications table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS job_applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date_applied TEXT NOT NULL, -- YYYY-MM-DD
-        company TEXT NOT NULL,
-        role TEXT NOT NULL,
-        salary_range TEXT,
-        status TEXT CHECK(status IN ('applied', 'interviewing', 'offered', 'rejected', 'withdrawn')) DEFAULT 'applied',
-        job_description_url TEXT,
-        notes TEXT,
-        resume_file_id INTEGER REFERENCES processed_files(id) ON DELETE SET NULL,
-        lead_id INTEGER REFERENCES job_leads(id) ON DELETE SET NULL,
-        recruiter_name TEXT,
-        recruiter_email TEXT,
-        cold_email_draft TEXT,
-        outreach_status TEXT CHECK(outreach_status IN ('pending', 'sent', 'replied', 'failed')) DEFAULT 'pending',
-        tailored_bullets TEXT,
-        cover_letter TEXT
-    );
-    """)
+    # 6. job_applications table (jobs actually applied to)
+    cursor.execute(JOB_APPLICATIONS_SQL.format(name="job_applications"))
     
     # 7. habit_logs table
     cursor.execute("""
@@ -483,9 +551,8 @@ def init_db():
         print("Migrating: Adding google_pending column to calendar_events table...")
         cursor.execute("ALTER TABLE calendar_events ADD COLUMN google_pending INTEGER DEFAULT 0;")
     
-    # MIGRATION: Add career columns to job_applications if they don't exist
-    cursor.execute("PRAGMA table_info(job_applications);")
-    job_app_columns = [row['name'] for row in cursor.fetchall()]
+    # MIGRATION: Add recruiter/lead columns to job_applications if they don't exist
+    job_app_columns = _table_columns(cursor, "job_applications")
     if 'lead_id' not in job_app_columns:
         print("Migrating: Adding lead_id column to job_applications table...")
         cursor.execute("ALTER TABLE job_applications ADD COLUMN lead_id INTEGER REFERENCES job_leads(id) ON DELETE SET NULL;")
@@ -495,75 +562,46 @@ def init_db():
     if 'recruiter_email' not in job_app_columns:
         print("Migrating: Adding recruiter_email column to job_applications table...")
         cursor.execute("ALTER TABLE job_applications ADD COLUMN recruiter_email TEXT;")
-    if 'cold_email_draft' not in job_app_columns:
-        print("Migrating: Adding cold_email_draft column to job_applications table...")
-        cursor.execute("ALTER TABLE job_applications ADD COLUMN cold_email_draft TEXT;")
-    if 'outreach_status' not in job_app_columns:
-        print("Migrating: Adding outreach_status column to job_applications table...")
-        cursor.execute("ALTER TABLE job_applications ADD COLUMN outreach_status TEXT CHECK(outreach_status IN ('pending', 'sent', 'replied', 'failed')) DEFAULT 'pending';")
-    if 'tailored_bullets' not in job_app_columns:
-        print("Migrating: Adding tailored_bullets column to job_applications table...")
-        cursor.execute("ALTER TABLE job_applications ADD COLUMN tailored_bullets TEXT;")
-    if 'cover_letter' not in job_app_columns:
-        print("Migrating: Adding cover_letter column to job_applications table...")
-        cursor.execute("ALTER TABLE job_applications ADD COLUMN cover_letter TEXT;")
     
-    # MIGRATION: Remove source CHECK constraint on job_leads if present
-    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='job_leads';")
-    row = cursor.fetchone()
-    if row and row['sql'] and "source IN (" in row['sql']:
-        print("Migrating: Removing source CHECK constraint on job_leads table...")
-        cursor.execute("PRAGMA foreign_keys=OFF;")
-        cursor.execute("ALTER TABLE job_leads RENAME TO job_leads_old;")
-        cursor.execute("""
-        CREATE TABLE job_leads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date_found TEXT NOT NULL,
-            company TEXT NOT NULL,
-            role TEXT NOT NULL,
-            location TEXT,
-            salary_range TEXT,
-            job_description TEXT,
-            job_url TEXT UNIQUE NOT NULL,
-            source TEXT NOT NULL,
-            status TEXT CHECK(status IN ('lead', 'ignored', 'applied')) DEFAULT 'lead',
-            profile_id INTEGER REFERENCES career_search_profiles(id) ON DELETE CASCADE,
-            is_remote INTEGER DEFAULT 0,
-            tier INTEGER DEFAULT 1,
-            match_score INTEGER DEFAULT 0
-        );
-        """)
-        cursor.execute("""
-            INSERT OR IGNORE INTO job_leads (id, date_found, company, role, location, salary_range, job_description, job_url, source, status, profile_id)
-            SELECT id, date_found, company, role, location, salary_range, job_description, job_url, source, status, profile_id
-            FROM job_leads_old;
-        """)
-        cursor.execute("DROP TABLE job_leads_old;")
-        cursor.execute("PRAGMA foreign_keys=ON;")
+    # MIGRATION: Retire job discovery / tailoring / outreach data (backed up to STORAGE_DIR first).
+    # Rebuilding job_leads also drops the old source CHECK constraint and adds is_remote/tier/match_score.
+    retire_job_hunt_schema(conn)
 
-    # MIGRATION: Add is_remote, tier, and match_score to job_leads if they don't exist
-    cursor.execute("PRAGMA table_info(job_leads);")
-    job_lead_columns = [row['name'] for row in cursor.fetchall()]
-    if 'is_remote' not in job_lead_columns:
-        print("Migrating: Adding is_remote column to job_leads table...")
-        cursor.execute("ALTER TABLE job_leads ADD COLUMN is_remote INTEGER DEFAULT 0;")
-    if 'tier' not in job_lead_columns:
-        print("Migrating: Adding tier column to job_leads table...")
-        cursor.execute("ALTER TABLE job_leads ADD COLUMN tier INTEGER DEFAULT 1;")
-    if 'match_score' not in job_lead_columns:
-        print("Migrating: Adding match_score column to job_leads table...")
-        cursor.execute("ALTER TABLE job_leads ADD COLUMN match_score INTEGER DEFAULT 0;")
-
-    # 6.5. outreach_logs table
+    # 6.5. application_events table: timeline per application (status changes, interviews, notes)
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS outreach_logs (
+    CREATE TABLE IF NOT EXISTS application_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        application_id INTEGER REFERENCES job_applications(id) ON DELETE CASCADE,
-        recipient_email TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        body TEXT NOT NULL,
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        status TEXT DEFAULT 'success'
+        application_id INTEGER NOT NULL REFERENCES job_applications(id) ON DELETE CASCADE,
+        event_date TEXT NOT NULL, -- YYYY-MM-DD
+        kind TEXT CHECK(kind IN ('status_change', 'interview', 'recruiter_contact', 'offer', 'note')) NOT NULL,
+        note TEXT,
+        created_by TEXT, -- MCP token name, or NULL when added from the dashboard
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 10. mcp_tokens table: one bearer token per agent (only a SHA-256 hash is stored)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS mcp_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        token_hash TEXT NOT NULL UNIQUE,
+        scopes TEXT NOT NULL, -- JSON array, e.g. ["career", "calendar", "career:write"]
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_used_at DATETIME,
+        revoked_at DATETIME
+    );
+    """)
+
+    # 11. mcp_call_log table: every MCP tool call
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS mcp_call_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token_name TEXT NOT NULL,
+        tool TEXT NOT NULL,
+        ok INTEGER NOT NULL,
+        error TEXT,
+        called_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
@@ -588,6 +626,9 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_subtasks_task_id ON task_subtasks(task_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_prerequisites_task_id ON task_prerequisites(task_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_prerequisites_prereq ON task_prerequisites(prerequisite_type, prerequisite_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_application_events_application_id ON application_events(application_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_applications_job_description_url ON job_applications(job_description_url);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mcp_call_log_called_at ON mcp_call_log(called_at);")
     
     conn.commit()
     conn.close()
