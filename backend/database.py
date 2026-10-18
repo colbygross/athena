@@ -606,6 +606,62 @@ def init_db():
     );
     """)
 
+    # 12. OAuth for MCP clients (claude.ai connectors etc.). Secrets are stored hashed,
+    # except registered client secrets, which the MCP SDK compares directly.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS oauth_clients (
+        client_id TEXT PRIMARY KEY,
+        client_info TEXT NOT NULL, -- JSON (RFC 7591 registration)
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS oauth_pending (
+        request_id TEXT PRIMARY KEY, -- consent page handle
+        client_id TEXT NOT NULL,
+        params TEXT NOT NULL, -- JSON authorization params
+        created_at REAL NOT NULL
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS oauth_grants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id TEXT NOT NULL,
+        label TEXT NOT NULL, -- shown in timelines and the call log
+        scopes TEXT NOT NULL, -- JSON array
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_used_at DATETIME,
+        revoked_at DATETIME
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS oauth_codes (
+        code_hash TEXT PRIMARY KEY,
+        grant_id INTEGER NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+        data TEXT NOT NULL, -- JSON: client_id, code_challenge, redirect_uri, scopes, resource
+        expires_at REAL NOT NULL
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS oauth_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        grant_id INTEGER NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+        kind TEXT CHECK(kind IN ('access', 'refresh')) NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        scopes TEXT NOT NULL, -- JSON array
+        resource TEXT,
+        expires_at INTEGER NOT NULL,
+        revoked_at DATETIME
+    );
+    """)
+    # 13. app_settings: small key/value store (e.g. the admin password hash)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """)
+
     # Create explicit indexes for performance optimization
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);")
@@ -630,6 +686,7 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_application_events_application_id ON application_events(application_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_applications_job_description_url ON job_applications(job_description_url);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mcp_call_log_called_at ON mcp_call_log(called_at);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_oauth_tokens_grant_id ON oauth_tokens(grant_id);")
     
     conn.commit()
     conn.close()

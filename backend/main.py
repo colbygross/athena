@@ -20,6 +20,7 @@ import agent
 import career
 import finance
 import mcp_server
+import oauth
 
 
 # Initialize DB on startup
@@ -41,6 +42,8 @@ app = FastAPI(title="Life Organizer Dashboard API", lifespan=lifespan)
 # the static-file catch-all so GET /mcp is not served as a frontend file.
 for _mcp_path in ("/mcp", "/mcp/"):
     app.router.add_route(_mcp_path, mcp_server.endpoint, methods=["GET", "POST", "DELETE"], include_in_schema=False)
+# OAuth for MCP clients: discovery metadata, /authorize, /token, /register, /revoke, approval page.
+app.router.routes.extend(oauth.routes())
 
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next):
@@ -83,6 +86,9 @@ def is_allowed_origin(origin: str) -> bool:
 
 @app.middleware("http")
 async def security_and_cors_middleware(request: Request, call_next):
+    # MCP and OAuth endpoints handle their own auth and CORS (public clients like claude.ai).
+    if request.url.path.startswith(oauth.OAUTH_PATH_PREFIXES):
+        return await call_next(request)
     origin = request.headers.get("origin")
     
     # 1. Handle CORS preflight OPTIONS requests
