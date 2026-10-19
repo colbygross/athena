@@ -294,9 +294,6 @@ function CalendarTasksTab({
     return days;
   };
 
-  // Compute timeline gaps on the fly for Day View
-  const dayTimelineHours = Array.from({ length: 15 }, (_, i) => i + 7); // 07:00 to 21:00
-
   const dayEvents = useMemo(() => {
     return filteredCalendarEvents.filter(ev => {
       const s = ev.start_time?.replace('T', ' ');
@@ -304,22 +301,71 @@ function CalendarTasksTab({
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [filteredCalendarEvents, selectedDayStr]);
 
+  // Day View time grid: each event is placed by its real start/end, and events
+  // that overlap share the width side by side instead of stacking on each other.
+  const dayLayout = useMemo(() => {
+    const toMins = (t) => {
+      const hm = t?.replace('T', ' ').slice(11, 16);
+      if (!hm || hm.length < 5) return null;
+      return parseInt(hm.slice(0, 2)) * 60 + parseInt(hm.slice(3, 5));
+    };
+
+    const items = dayEvents.map(ev => {
+      const start = toMins(ev.start_time) ?? 0;
+      let end = toMins(ev.end_time);
+      // Ends on a later day → runs to midnight; missing/inverted end → 30m block
+      const endDay = ev.end_time?.replace('T', ' ').slice(0, 10);
+      if (endDay && endDay > selectedDayStr) end = 24 * 60;
+      if (end == null || end <= start) end = Math.min(start + 30, 24 * 60);
+      return { ev, start, end };
+    });
+
+    // Group transitively-overlapping events into clusters, then give each
+    // event the first free column in its cluster.
+    const clusters = [];
+    let cluster = null;
+    let clusterEnd = -1;
+    items.forEach(item => {
+      if (!cluster || item.start >= clusterEnd) {
+        cluster = [];
+        clusters.push(cluster);
+        clusterEnd = item.end;
+      } else {
+        clusterEnd = Math.max(clusterEnd, item.end);
+      }
+      cluster.push(item);
+    });
+    clusters.forEach(group => {
+      const colEnds = [];
+      group.forEach(item => {
+        let col = colEnds.findIndex(e => e <= item.start);
+        if (col === -1) col = colEnds.length;
+        colEnds[col] = item.end;
+        item.col = col;
+      });
+      group.forEach(item => { item.cols = colEnds.length; });
+    });
+
+    // Show 07:00–22:00 by default, widened to fit any earlier/later event
+    let startHour = 7;
+    let endHour = 22;
+    items.forEach(({ start, end }) => {
+      startHour = Math.min(startHour, Math.floor(start / 60));
+      endHour = Math.max(endHour, Math.ceil(end / 60));
+    });
+    const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+
+    return { items, startMin: startHour * 60, hours };
+  }, [dayEvents, selectedDayStr]);
+
+  const HOUR_PX = 64;
+  const minsToPx = (mins) => ((mins - dayLayout.startMin) / 60) * HOUR_PX;
+
   // Calculate gaps between dayEvents
   const computedGaps = useMemo(() => {
     if (!selectedDayStr) return [];
-    const busy = [];
-    dayEvents.forEach(ev => {
-      const sStr = ev.start_time?.replace('T', ' ').slice(11, 16);
-      const eStr = ev.end_time?.replace('T', ' ').slice(11, 16);
-      if (sStr && eStr) {
-        const sMins = parseInt(sStr.slice(0, 2)) * 60 + parseInt(sStr.slice(3, 5));
-        const eMins = parseInt(eStr.slice(0, 2)) * 60 + parseInt(eStr.slice(3, 5));
-        if (eMins > sMins) {
-          busy.push({ s: sMins, e: eMins });
-        }
-      }
-    });
-
+    // Same spans the time grid draws, so free windows never sit under an event
+    const busy = dayLayout.items.map(({ start, end }) => ({ s: start, e: end }));
     busy.sort((a, b) => a.s - b.s);
     const dayStart = 8 * 60; // 08:00
     const dayEnd = 22 * 60; // 22:00
@@ -371,7 +417,7 @@ function CalendarTasksTab({
         recommended_tasks: matching.slice(0, 5)
       };
     });
-  }, [dayEvents, selectedDayStr, tasksData]);
+  }, [dayLayout, selectedDayStr, tasksData]);
 
   // Open Gap Popover
   const handleOpenGap = (gap) => {
@@ -622,94 +668,94 @@ function CalendarTasksTab({
                 </div>
 
                 <div className="timeline-container">
-                  {dayTimelineHours.map(hour => {
-                    const hourStr = `${String(hour).padStart(2, '0')}:00`;
-                    
-                    // Events starting or active in this hour
-                    const hourEvents = dayEvents.filter(ev => {
-                      const s = ev.start_time?.replace('T', ' ').slice(11, 16);
-                      if (!s) return false;
-                      const h = parseInt(s.slice(0, 2));
-                      return h === hour;
-                    });
+                  <div className="timeline-grid" style={{ height: `${dayLayout.hours.length * HOUR_PX}px` }}>
+                    {dayLayout.hours.map(hour => (
+                      <div key={hour} className="timeline-hour-line" style={{ top: `${minsToPx(hour * 60)}px` }}>
+                        <span className="timeline-hour-label">{`${String(hour).padStart(2, '0')}:00`}</span>
+                      </div>
+                    ))}
 
-                    // Gaps in this hour
-                    const hourGaps = computedGaps.filter(g => {
-                      const sH = parseInt(g.start.slice(0, 2));
-                      return sH === hour;
-                    });
+                    <div className="timeline-track">
+                      {/* Free windows: only the time no event covers */}
+                      {computedGaps.map(gap => {
+                        const height = (gap.duration_minutes / 60) * HOUR_PX;
+                        return (
+                          <div role="button" tabIndex={0} onKeyDown={activateOnKey}
+                            key={`gap-${gap.startMinutes}`}
+                            className={`timeline-gap-block ${height < 40 ? 'is-compact' : ''}`}
+                            style={{ top: `${minsToPx(gap.startMinutes) + 1}px`, height: `${height - 2}px` }}
+                            onClick={() => handleOpenGap(gap)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--accent-cyan)', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                              <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
+                              <strong style={{ whiteSpace: 'nowrap' }}>{gap.duration_minutes}m Free Window</strong>
+                              <span className="timeline-gap-range">({gap.start} – {gap.end})</span>
+                            </div>
+                            <span className="timeline-gap-cta">
+                              {gap.recommended_tasks.length > 0 ? `View ${gap.recommended_tasks.length} recommended tasks` : 'No tasks fit'}
+                            </span>
+                          </div>
+                        );
+                      })}
 
-                    return (
-                      <div key={hour} className="timeline-hour-row">
-                        <div className="timeline-hour-label">{hourStr}</div>
-                        <div className="timeline-hour-slot">
-                          {/* Scheduled Events */}
-                          {hourEvents.map(ev => {
-                            const isGoogle = ev.source === 'google';
-                            const evColor = ev.color || EVENT_COLORS[0];
-                            const tags = Array.isArray(ev.tags) ? ev.tags : [];
-                            const attachedCount = ev.attached_tasks?.length || 0;
+                      {/* Scheduled events, side by side when they overlap */}
+                      {dayLayout.items.map(({ ev, start, end, col, cols }) => {
+                        const isGoogle = ev.source === 'google';
+                        const evColor = ev.color || EVENT_COLORS[0];
+                        const tags = Array.isArray(ev.tags) ? ev.tags : [];
+                        const attachedCount = ev.attached_tasks?.length || 0;
+                        const height = ((end - start) / 60) * HOUR_PX;
+                        const isCompact = height < 40;
 
-                            return (
-                              <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
-                                key={ev.id} 
-                                className="timeline-event-card"
-                                style={{ '--event-color': evColor }}
-                                onClick={() => handleOpenEventDetail(ev)}
-                              >
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflow: 'hidden' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ev.title}</span>
-                                    {isGoogle && (
-                                      <span style={{ fontSize: 'var(--text-xs)', padding: '1px 4px', borderRadius: '3px', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
-                                        Google
-                                      </span>
-                                    )}
-                                    {attachedCount > 0 && (
-                                      <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)' }}>
-                                        {attachedCount} tasks
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                                    {ev.start_time.slice(11, 16)} – {ev.end_time.slice(11, 16)} {ev.description ? `• ${ev.description}` : ''}
-                                  </div>
-                                </div>
-
-                                {tags.length > 0 && (
-                                  <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                    {tags.map(t => (
-                                      <span key={t} style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                                        {t}
-                                      </span>
-                                    ))}
-                                  </div>
+                        return (
+                          <div role="button" tabIndex={0} onKeyDown={activateOnKey}
+                            key={ev.id}
+                            className={`timeline-event-card ${isCompact ? 'is-compact' : ''}`}
+                            title={`${ev.title} (${ev.start_time?.slice(11, 16)} – ${ev.end_time?.slice(11, 16)})`}
+                            style={{
+                              '--event-color': evColor,
+                              top: `${minsToPx(start) + 1}px`,
+                              height: `${height - 2}px`,
+                              left: `calc(${(col / cols) * 100}% + 2px)`,
+                              width: `calc(${100 / cols}% - 4px)`,
+                            }}
+                            onClick={() => handleOpenEventDetail(ev)}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+                                <span className="timeline-event-title">{ev.title}</span>
+                                {isGoogle && cols === 1 && (
+                                  <span style={{ fontSize: 'var(--text-xs)', padding: '1px 4px', borderRadius: '3px', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
+                                    Google
+                                  </span>
+                                )}
+                                {attachedCount > 0 && cols === 1 && (
+                                  <span style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                    {attachedCount} tasks
+                                  </span>
                                 )}
                               </div>
-                            );
-                          })}
-
-                          {/* Empty Gap Blockers */}
-                          {hourGaps.map((gap, gIdx) => (
-                            <div role="button" tabIndex={0} onKeyDown={activateOnKey} 
-                              key={`gap-${gIdx}`}
-                              className="timeline-gap-block"
-                              onClick={() => handleOpenGap(gap)}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--accent-cyan)' }}>
-                                <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
-                                <strong>{gap.duration_minutes}m Free Window</strong>
-                                <span style={{ color: 'var(--text-muted)' }}>({gap.start} – {gap.end})</span>
-                              </div>
-                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-                                {gap.recommended_tasks.length > 0 ? `View ${gap.recommended_tasks.length} recommended tasks` : 'No tasks fit'}
-                              </span>
+                              {!isCompact && (
+                                <div className="timeline-event-meta">
+                                  {ev.start_time.slice(11, 16)} – {ev.end_time?.slice(11, 16)} {ev.description ? `• ${ev.description}` : ''}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+
+                            {tags.length > 0 && cols === 1 && !isCompact && (
+                              <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                {tags.map(t => (
+                                  <span key={t} style={{ fontSize: 'var(--text-xs)', padding: '1px 5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
