@@ -196,3 +196,15 @@ def test_admin_password_rules():
         oauth.set_admin_password("short")
     oauth.set_admin_password(PASSWORD)
     assert oauth.check_admin_password(PASSWORD) and not oauth.check_admin_password("nope")
+
+
+def test_clients_registered_before_new_scopes_can_request_them(client):
+    oauth.set_admin_password(PASSWORD)
+    res = client.post("/register", json={"client_name": "Old", "redirect_uris": [REDIRECT], "scope": "career",
+                                         "grant_types": ["authorization_code", "refresh_token"],
+                                         "token_endpoint_auth_method": "none"})
+    client_id = res.json()["client_id"]
+    _, challenge = _pkce()
+    request_id = _authorize(client, client_id, challenge, scope="career tasks:write")
+    page = client.get(f"/oauth/consent?request={request_id}").text
+    assert 'value="tasks:write" checked' in page
