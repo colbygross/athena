@@ -1,6 +1,14 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
 import { activateOnKey } from '../a11y';
+import { PrivateBadge, PrivacyToggle, notePath } from './PrivacyToggle';
+
+const AREA_CATEGORIES = ["Career", "Finances", "Fitness", "Habits", "Health", "Learning"];
+
+// Folders outside the usual six (a Private/ folder, say) still get listed, after them.
+const otherCategories = (areasList) => [...new Set(areasList.map(a => a.category))]
+  .filter(c => c !== '.' && !AREA_CATEGORIES.some(k => k.toLowerCase() === c.toLowerCase()))
+  .sort();
 
 function AreasTab({
   areasList,
@@ -12,8 +20,12 @@ function AreasTab({
   setIsEditingArea,
   areaSaving,
   saveAreaContent,
-  fetchAreaContent
+  fetchAreaContent,
+  privateNotes,
+  privacyBusy,
+  setItemPrivate
 }) {
+  const selectedPath = selectedArea ? notePath('02_Areas', selectedArea.filename, selectedArea.category) : null;
   return (
     <div>
       <header className="page-header page-header--compact">
@@ -55,7 +67,7 @@ function AreasTab({
               <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No area documents archived in vault.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                {["Career", "Finances", "Fitness", "Habits", "Health", "Learning"].map(cat => {
+                {[...AREA_CATEGORIES, ...otherCategories(areasList)].map(cat => {
                   const catAreas = areasList.filter(a => a.category.toLowerCase() === cat.toLowerCase());
                   if (catAreas.length === 0) return null;
                   return (
@@ -94,6 +106,7 @@ function AreasTab({
                               <div className="item-meta">
                                 <span className="item-title" style={{ fontSize: 'var(--text-xs)', color: isSel ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                                   {area.title}
+                                  {privateNotes.has(notePath('02_Areas', area.filename, area.category)) && <> <PrivateBadge /></>}
                                 </span>
                                 <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>{area.filename}</span>
                               </div>
@@ -119,7 +132,15 @@ function AreasTab({
                   <span className="project-location-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Location: 02_Areas/{selectedArea.category}/{selectedArea.filename}</span>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <PrivacyToggle
+                    key={selectedPath}
+                    isPrivate={privateNotes.has(selectedPath)}
+                    busy={privacyBusy === selectedPath}
+                    disabled={isEditingArea}
+                    disabledReason="Save or cancel your edits before changing privacy."
+                    onToggle={(next) => setItemPrivate({ path: selectedPath }, next, () => fetchAreaContent(selectedArea.category, selectedArea.filename))}
+                  />
                   {!isEditingArea ? (
                     <button 
                       className="btn-primary" 

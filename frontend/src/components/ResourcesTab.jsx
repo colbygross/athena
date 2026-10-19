@@ -1,6 +1,7 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
 import { activateOnKey } from '../a11y';
+import { PrivateBadge, PrivacyToggle, notePath } from './PrivacyToggle';
 
 function ResourcesTab({
   resourcesList,
@@ -12,8 +13,12 @@ function ResourcesTab({
   setIsEditingResource,
   resourceSaving,
   saveResourceContent,
-  fetchResourceContent
+  fetchResourceContent,
+  privateNotes,
+  privacyBusy,
+  setItemPrivate
 }) {
+  const selectedPath = selectedResource ? notePath('03_Resources', selectedResource) : null;
   return (
     <div>
       <header className="page-header page-header--compact">
@@ -77,6 +82,7 @@ function ResourcesTab({
                       <div className="item-meta">
                         <span className="item-title" style={{ color: isSel ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                           {resItem.title}
+                          {privateNotes.has(notePath('03_Resources', resItem.filename)) && <> <PrivateBadge /></>}
                         </span>
                         <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>{resItem.filename}</span>
                       </div>
@@ -98,7 +104,15 @@ function ResourcesTab({
                   <span className="project-location-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Location: 03_Resources/{selectedResource}</span>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <PrivacyToggle
+                    key={selectedPath}
+                    isPrivate={privateNotes.has(selectedPath)}
+                    busy={privacyBusy === selectedPath}
+                    disabled={isEditingResource}
+                    disabledReason="Save or cancel your edits before changing privacy."
+                    onToggle={(next) => setItemPrivate({ path: selectedPath }, next, () => fetchResourceContent(selectedResource))}
+                  />
                   {!isEditingResource ? (
                     <button 
                       className="btn-primary" 

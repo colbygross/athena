@@ -3864,3 +3864,123 @@ h1,
     min-height: 44px;
   }
 }
+
+/* Private flag: lock badge in lists and the toggle in note views and file rows */
+.private-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--focus-ring);
+  vertical-align: middle;
+}
+
+.private-badge .material-symbols-outlined {
+  font-size: var(--text-md);
+}
+
+.privacy-toggle-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.privacy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--text-secondary);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.privacy-toggle .material-symbols-outlined {
+  font-size: var(--text-md);
+}
+
+.privacy-toggle:hover:not([aria-disabled="true"]) {
+  background: var(--surface-2);
+}
+
+.privacy-toggle.is-private {
+  background: color-mix(in srgb, var(--focus-ring) 14%, transparent);
+  border-color: var(--focus-ring);
+  color: var(--focus-ring);
+}
+
+.privacy-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.privacy-toggle--compact {
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.privacy-toggle--compact.is-private {
+  border-color: transparent;
+}
+
+.privacy-intro {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 20;
+  width: min(18rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.privacy-intro-dismiss {
+  align-self: flex-end;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--text-secondary);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.file-row > a {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .privacy-toggle-wrap:not(.privacy-toggle-wrap--compact) {
+    flex-wrap: wrap;
+  }
+  .privacy-intro {
+    position: static;
+    flex-basis: 100%;
+    width: auto;
+    margin-top: 0.5rem;
+    box-shadow: none;
+  }
+}
