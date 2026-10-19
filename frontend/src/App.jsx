@@ -143,6 +143,11 @@ function App() {
   const [isEditingArea, setIsEditingArea] = useState(false);
   const [areaSaving, setAreaSaving] = useState(false);
 
+  // Private flags (GET /api/privacy): vault-relative note paths and processed_files ids
+  const [privateNotes, setPrivateNotes] = useState(() => new Set());
+  const [privateFileIds, setPrivateFileIds] = useState(() => new Set());
+  const [privacyBusy, setPrivacyBusy] = useState(null); // key of the item being toggled
+
 
   const [taskForm, setTaskForm] = useState({ title: '', category: 'general', due_date: '', priority: 'medium', importance: 'minor' });
   const [eventForm, setEventForm] = useState({ title: '', description: '', start_date: new Date().toISOString().split('T')[0], start_time: '12:00', end_date: new Date().toISOString().split('T')[0], end_time: '13:00' });
@@ -208,6 +213,45 @@ function App() {
       fetchFinances();
     }
   }, [filterAccount, filterDateRange]);
+
+  const fetchPrivacy = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/privacy`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const res = await r.json();
+      setPrivateNotes(new Set(res.private_notes || []));
+      setPrivateFileIds(new Set((res.private_files || []).map(f => f.id)));
+    } catch (err) {
+      console.error("Error fetching privacy:", err);
+    }
+  };
+
+  // target is { path } for a vault note or { file_id } for an ingested file.
+  // Changing a note's flag rewrites its frontmatter, so onDone reloads the open note.
+  const setItemPrivate = async (target, isPrivate, onDone) => {
+    const key = target.path ?? `file:${target.file_id}`;
+    setPrivacyBusy(key);
+    try {
+      const r = await fetch(`${API_BASE}/privacy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...target, private: isPrivate })
+      });
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        showToast(typeof res.detail === 'string' ? res.detail : "Couldn't change privacy. Try again.", 'error');
+        return;
+      }
+      await fetchPrivacy();
+      if (onDone) onDone();
+      showToast(isPrivate ? 'Marked private. Cloud agents can no longer read it.' : 'No longer private. Cloud agents can read it again.', 'success');
+    } catch (err) {
+      console.error("Error setting privacy:", err);
+      showToast("Couldn't change privacy. Check that Athena is running and try again.", 'error');
+    } finally {
+      setPrivacyBusy(null);
+    }
+  };
 
   const fetchProjectContent = async (filename) => {
     try {
@@ -477,6 +521,7 @@ function App() {
         setSelectedArea(null);
         setAreaContent("");
       }
+      fetchPrivacy();
       
       const briefs = briefListRes.briefs || [];
       setDailyBriefsList(briefs);
@@ -722,6 +767,9 @@ function App() {
             fetchAllData={fetchAllData}
             setActiveTab={navigateToTab}
             fileUrl={fileUrl}
+            privateFileIds={privateFileIds}
+            privacyBusy={privacyBusy}
+            setItemPrivate={setItemPrivate}
             handleFormSubmit={handleFormSubmit}
             showToast={showToast}
             API_BASE={API_BASE}
@@ -804,6 +852,9 @@ function App() {
             triggerAgent={triggerAgent}
             overviewData={overviewData}
             fileUrl={fileUrl}
+            privateFileIds={privateFileIds}
+            privacyBusy={privacyBusy}
+            setItemPrivate={setItemPrivate}
           />
         )}
 
@@ -820,6 +871,9 @@ function App() {
             projectSaving={projectSaving}
             saveProjectContent={saveProjectContent}
             fetchProjectContent={fetchProjectContent}
+            privateNotes={privateNotes}
+            privacyBusy={privacyBusy}
+            setItemPrivate={setItemPrivate}
           />
         )}
 
@@ -836,6 +890,9 @@ function App() {
             resourceSaving={resourceSaving}
             saveResourceContent={saveResourceContent}
             fetchResourceContent={fetchResourceContent}
+            privateNotes={privateNotes}
+            privacyBusy={privacyBusy}
+            setItemPrivate={setItemPrivate}
           />
         )}
 
@@ -852,6 +909,9 @@ function App() {
             areaSaving={areaSaving}
             saveAreaContent={saveAreaContent}
             fetchAreaContent={fetchAreaContent}
+            privateNotes={privateNotes}
+            privacyBusy={privacyBusy}
+            setItemPrivate={setItemPrivate}
           />
         )}
 

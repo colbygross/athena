@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { HABITS, formatLocalDate } from '../constants';
 import { parseDailyBrief } from './BriefPanel';
 import QuickLog from './QuickLog';
+import { PrivacyToggle } from './PrivacyToggle';
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 const byPriority = (a, b) => (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1);
@@ -51,6 +52,9 @@ function OverviewTab({
   fetchAllData,
   setActiveTab,
   fileUrl,
+  privateFileIds,
+  privacyBusy,
+  setItemPrivate,
   handleFormSubmit,
   showToast,
   API_BASE,
@@ -352,13 +356,22 @@ function OverviewTab({
             ) : (
               <div className="item-list">
                 {overviewData.recent_files.slice(0, 3).map((file) => (
-                  <a key={file.id} href={fileUrl(file.new_path)} target="_blank" rel="noopener noreferrer" className="list-item overview-file-link">
-                    <div className="item-meta">
-                      <span className="item-title">{file.original_name}</span>
-                      <span className="item-subtitle">Sorted to: {file.category.toUpperCase()}</span>
-                    </div>
-                    <span className="material-symbols-outlined file-icon" aria-hidden="true">description</span>
-                  </a>
+                  <div key={file.id} className="file-row">
+                    <a href={fileUrl(file.new_path)} target="_blank" rel="noopener noreferrer" className="list-item overview-file-link">
+                      <div className="item-meta">
+                        <span className="item-title">{file.original_name}</span>
+                        <span className="item-subtitle">Sorted to: {file.category.toUpperCase()}</span>
+                      </div>
+                      <span className="material-symbols-outlined file-icon" aria-hidden="true">description</span>
+                    </a>
+                    <PrivacyToggle
+                      compact
+                      itemName={file.original_name}
+                      isPrivate={privateFileIds.has(file.id)}
+                      busy={privacyBusy === `file:${file.id}`}
+                      onToggle={(next) => setItemPrivate({ file_id: file.id }, next)}
+                    />
+                  </div>
                 ))}
               </div>
             )}

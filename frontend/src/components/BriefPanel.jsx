@@ -235,7 +235,8 @@ function parseDailyBrief(content) {
 
 function LinearMarkdownRenderer({ content }) {
   if (!content) return null;
-  const lines = content.split('\n');
+  // Frontmatter (e.g. `private: true`) is metadata, not part of the reading view.
+  const lines = content.replace(/^---\s*\n[\s\S]*?\n---\s*(\n|$)/, '').split('\n');
   let inList = false;
   let listItems = [];
   const renderedElements = [];

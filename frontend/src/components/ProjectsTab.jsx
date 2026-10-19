@@ -1,6 +1,7 @@
 import React from 'react';
 import { LinearMarkdownRenderer } from './BriefPanel';
 import { activateOnKey } from '../a11y';
+import { PrivateBadge, PrivacyToggle, notePath } from './PrivacyToggle';
 
 function ProjectsTab({
   projectsList,
@@ -12,8 +13,12 @@ function ProjectsTab({
   setIsEditingProject,
   projectSaving,
   saveProjectContent,
-  fetchProjectContent
+  fetchProjectContent,
+  privateNotes,
+  privacyBusy,
+  setItemPrivate
 }) {
+  const selectedPath = selectedProject ? notePath('01_Projects', selectedProject) : null;
   return (
     <div>
       <header className="page-header page-header--compact">
@@ -77,6 +82,7 @@ function ProjectsTab({
                       <div className="item-meta">
                         <span className="item-title" style={{ color: isSel ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: isSel ? 'bold' : 'normal' }}>
                           {proj.title}
+                          {privateNotes.has(notePath('01_Projects', proj.filename)) && <> <PrivateBadge /></>}
                         </span>
                         <span className="item-subtitle" style={{ fontSize: 'var(--text-xs)' }}>{proj.filename}</span>
                       </div>
@@ -98,7 +104,15 @@ function ProjectsTab({
                   <span className="project-location-text" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Location: 01_Projects/{selectedProject}</span>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <PrivacyToggle
+                    key={selectedPath}
+                    isPrivate={privateNotes.has(selectedPath)}
+                    busy={privacyBusy === selectedPath}
+                    disabled={isEditingProject}
+                    disabledReason="Save or cancel your edits before changing privacy."
+                    onToggle={(next) => setItemPrivate({ path: selectedPath }, next, () => fetchProjectContent(selectedProject))}
+                  />
                   {!isEditingProject ? (
                     <button 
                       className="btn-primary" 

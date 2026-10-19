@@ -1,9 +1,13 @@
 import React from 'react';
+import { PrivacyToggle } from './PrivacyToggle';
 
 function InboxTab({
   agentStatus,
   triggerAgent,
   overviewData,
+  privateFileIds,
+  privacyBusy,
+  setItemPrivate,
   fileUrl
 }) {
   return (
@@ -73,21 +77,29 @@ function InboxTab({
             ) : (
               <div className="item-list">
                 {overviewData.recent_files.map((file) => (
-                  <a 
-                    key={file.id} 
-                    href={fileUrl(file.new_path)} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="list-item" 
-                    style={{ textDecoration: 'none', color: 'inherit' }}
-                  >
-                    <div className="item-meta">
-                      <span className="item-title">{file.original_name}</span>
-                      <span className="item-subtitle">Moved to: {file.new_path}</span>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Processed at: {file.processed_at}</span>
-                    </div>
-                    <span className="material-symbols-outlined" style={{ color: 'var(--color-success)' }} aria-hidden="true">check_circle</span>
-                  </a>
+                  <div key={file.id} className="file-row">
+                    <a 
+                      href={fileUrl(file.new_path)} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="list-item" 
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
+                      <div className="item-meta">
+                        <span className="item-title">{file.original_name}</span>
+                        <span className="item-subtitle">Moved to: {file.new_path}</span>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Processed at: {file.processed_at}</span>
+                      </div>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--color-success)' }} aria-hidden="true">check_circle</span>
+                    </a>
+                    <PrivacyToggle
+                      compact
+                      itemName={file.original_name}
+                      isPrivate={privateFileIds.has(file.id)}
+                      busy={privacyBusy === `file:${file.id}`}
+                      onToggle={(next) => setItemPrivate({ file_id: file.id }, next)}
+                    />
+                  </div>
                 ))}
               </div>
             )}
