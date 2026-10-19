@@ -143,8 +143,8 @@ function AreasTab({
                   />
                   {!isEditingArea ? (
                     <button 
-                      className="btn-primary" 
-                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto', border: '1px solid var(--text-secondary)', background: 'transparent' }}
+                      className="btn-secondary" 
+                      style={{ fontSize: 'var(--text-xs)', padding: '0.35rem 0.75rem', height: 'auto' }}
                       onClick={() => setIsEditingArea(true)}
                     >
                       Edit markdown
