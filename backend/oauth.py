@@ -234,7 +234,13 @@ class AthenaOAuthProvider:
             row = conn.execute("SELECT client_info FROM oauth_clients WHERE client_id = ?", (client_id,)).fetchone()
         finally:
             conn.close()
-        return OAuthClientInformationFull.model_validate_json(row["client_info"]) if row else None
+        if not row:
+            return None
+        client = OAuthClientInformationFull.model_validate_json(row["client_info"])
+        # Clients may request any current scope; the approval page decides what a connection gets.
+        # (Otherwise clients registered before a scope existed could never be granted it.)
+        client.scope = " ".join(ALL_SCOPES)
+        return client
 
     async def register_client(self, client_info):
         conn = _db()
