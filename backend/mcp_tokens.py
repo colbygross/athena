@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
-Manage bearer tokens for Athena's MCP server (one token per agent).
+Manage access to Athena's MCP server.
+
+OAuth (how claude.ai connectors and most MCP clients connect):
+  python backend/mcp_tokens.py set-admin-password      # password for the approval page
+  python backend/mcp_tokens.py grants                  # approved connections
+  python backend/mcp_tokens.py revoke-grant <id>
+
+Static bearer tokens (scripts and clients that can send headers):
 
   python backend/mcp_tokens.py create <name> --preset job-agent
   python backend/mcp_tokens.py create <name> --scopes career,calendar,career:write
@@ -11,6 +18,7 @@ Manage bearer tokens for Athena's MCP server (one token per agent).
 The plaintext token is printed once by `create`; only its hash is stored.
 """
 import argparse
+import getpass
 import os
 import sys
 
@@ -18,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import init_db, create_new_connection
 import mcp_server
+import oauth
 
 
 def main():
@@ -35,6 +44,11 @@ def main():
     revoke.add_argument("name")
     log = sub.add_parser("log", help="Show recent MCP tool calls")
     log.add_argument("--limit", type=int, default=50)
+    pw = sub.add_parser("set-admin-password", help="Set the password for the OAuth approval page")
+    pw.add_argument("--stdin", action="store_true", help="Read the password from stdin instead of prompting")
+    sub.add_parser("grants", help="List OAuth connections")
+    revoke_grant = sub.add_parser("revoke-grant", help="Revoke an OAuth connection and all its tokens")
+    revoke_grant.add_argument("id", type=int)
 
     args = parser.parse_args()
     init_db()
@@ -56,6 +70,26 @@ def main():
         if not mcp_server.revoke_token(args.name):
             sys.exit(f"No active token named '{args.name}'")
         print(f"Revoked '{args.name}'.")
+    elif args.command == "set-admin-password":
+        if args.stdin:
+            password = sys.stdin.readline().rstrip("\n")
+        else:
+            password = getpass.getpass("New admin password: ")
+            if getpass.getpass("Repeat: ") != password:
+                sys.exit("Passwords don't match.")
+        try:
+            oauth.set_admin_password(password)
+        except ValueError as e:
+            sys.exit(f"Error: {e}")
+        print("Admin password set.")
+    elif args.command == "grants":
+        for g in oauth.list_grants():
+            state = f"revoked {g['revoked_at']}" if g["revoked_at"] else f"last used {g['last_used_at'] or 'never'}"
+            print(f"{g['id']:<4} {g['label']:<28} {g['client']:<20} {','.join(g['scopes']):<50} {state}")
+    elif args.command == "revoke-grant":
+        if not oauth.revoke_grant(args.id):
+            sys.exit(f"No active grant {args.id}")
+        print(f"Revoked grant {args.id}.")
     elif args.command == "log":
         conn = create_new_connection()
         try:

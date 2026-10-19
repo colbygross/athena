@@ -3,8 +3,9 @@ Athena MCP server: lets external agents (Claude Code, cloud routines, ...) read 
 data and record job-hunt activity.
 
 Mounted inside the FastAPI app at /mcp (Streamable HTTP, stateless, JSON responses).
-Every request needs `Authorization: Bearer <token>`; tokens are per agent, carry scopes,
-are stored as SHA-256 hashes and are managed with backend/mcp_tokens.py.
+Every request needs `Authorization: Bearer <token>`: either an OAuth access token issued by
+oauth.py (how claude.ai connectors and other MCP clients sign in) or a static per-agent token
+managed with backend/mcp_tokens.py. Both carry scopes and are stored as SHA-256 hashes.
 
 Scopes: one read scope per domain (DOMAINS) plus `career:write`. Everything except career
 is read-only. Each token is rate limited and every tool call is logged in mcp_call_log.
@@ -182,10 +183,13 @@ class MCPEndpoint:
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
         auth = headers.get("authorization", "")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else None
-        agent_info = authenticate(token)
+        import oauth  # imported here: oauth imports this module
+        agent_info = authenticate(token) or oauth.verify_access_token(token)
         if agent_info is None:
+            # RFC 9728: point OAuth clients at the protected resource metadata so they can sign in.
+            challenge = f'Bearer error="invalid_token", resource_metadata="{oauth.PROTECTED_RESOURCE_METADATA_URL}"'
             await _send_json(send, 401, {"error": "invalid_token", "detail": "Missing or invalid bearer token"},
-                             [(b"www-authenticate", b'Bearer realm="athena"')])
+                             [(b"www-authenticate", challenge.encode())])
             return
         if not rate_limiter.allow(agent_info["name"]):
             await _send_json(send, 429, {"error": "rate_limited",
