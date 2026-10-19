@@ -11,7 +11,7 @@ Athena is both the authorization server and the protected resource:
 Each approval is a grant (oauth_grants) with a label, scopes and rotating tokens; revoking the
 grant revokes all of its tokens. Authorization codes and tokens are stored only as SHA-256 hashes.
 
-Config: ATHENA_PUBLIC_URL (the public origin, e.g. https://host.ts.net:8443) and an admin
+Config: ATHENA_PUBLIC_URL (the public origin, e.g. https://host.tailnet.ts.net) and an admin
 password set with `python backend/mcp_tokens.py set-admin-password`.
 """
 import hashlib
