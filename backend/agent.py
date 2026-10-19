@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dotenv import load_dotenv
 from database import get_db_connection, init_db
+import privacy
+from privacy import marker as private_marker
 
 # Calendar imports
 from icalendar import Calendar, Event as ICalEvent
@@ -681,8 +683,9 @@ def save_data_to_db(analysis_results, relative_moved_path):
             )
         elif category == "health" and struct:
             cursor.execute(
-                """INSERT INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO health_logs (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes, file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(date) DO UPDATE SET
+                   file_id = excluded.file_id,
                    weight_lbs = COALESCE(excluded.weight_lbs, weight_lbs),
                    sleep_hours = COALESCE(excluded.sleep_hours, sleep_hours),
                    mood = COALESCE(excluded.mood, mood),
@@ -696,7 +699,8 @@ def save_data_to_db(analysis_results, relative_moved_path):
                     struct.get("mood"),
                     struct.get("systolic"),
                     struct.get("diastolic"),
-                    struct.get("notes", desc)
+                    struct.get("notes", desc),
+                    file_id
                 )
             )
         elif category == "learning" and struct:
@@ -854,10 +858,12 @@ def generate_obsidian_summaries():
     os.makedirs(os.path.join(VAULT_DIR, "Summaries"), exist_ok=True)
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Rows that came from private files are tagged so cloud models never see them (see privacy.py).
+    private_files = privacy.private_file_ids(conn)
     
     # 1. Weekly Finance Summary
     cursor.execute("""
-        SELECT date, amount, type, category, merchant, description 
+        SELECT date, amount, type, category, merchant, description, file_id
         FROM transactions 
         ORDER BY date DESC LIMIT 20
     """)
@@ -868,14 +874,14 @@ def generate_obsidian_summaries():
     finance_md.append("| --- | --- | --- | --- | --- |")
     for tx in txs:
         sign = "+" if tx['type'] == 'income' else "-"
-        finance_md.append(f"| {tx['date']} | {tx['merchant']} | {tx['category']} | {tx['type'].upper()} | {sign}${tx['amount']:.2f} |")
+        finance_md.append(f"| {tx['date']} | {tx['merchant']} | {tx['category']} | {tx['type'].upper()} | {sign}${tx['amount']:.2f}{private_marker(tx['file_id'] in private_files)} |")
         
     # Write to Summaries
     write_file_atomically(os.path.join(VAULT_DIR, "Summaries", "Financial_Summary.md"), "\n".join(finance_md))
         
     # 2. Fitness & Health Summary
     cursor.execute("""
-        SELECT date, activity_type, duration_minutes, distance_km, calories_burned, notes 
+        SELECT date, activity_type, duration_minutes, distance_km, calories_burned, notes, file_id
         FROM fitness_logs 
         ORDER BY date DESC LIMIT 10
     """)
@@ -887,27 +893,27 @@ def generate_obsidian_summaries():
     for w in workouts:
         dist = f"{w['distance_km']} km" if w['distance_km'] else "N/A"
         cals = w['calories_burned'] if w['calories_burned'] else "N/A"
-        fitness_md.append(f"| {w['date']} | {w['activity_type'].capitalize()} | {w['duration_minutes']} mins | {dist} | {cals} | {w['notes']} |")
+        fitness_md.append(f"| {w['date']} | {w['activity_type'].capitalize()} | {w['duration_minutes']} mins | {dist} | {cals} | {w['notes']}{private_marker(w['file_id'] in private_files)} |")
         
-    cursor.execute("SELECT date, weight_lbs, sleep_hours, mood FROM health_logs ORDER BY date DESC LIMIT 7")
+    cursor.execute("SELECT date, weight_lbs, sleep_hours, mood, file_id FROM health_logs ORDER BY date DESC LIMIT 7")
     health = cursor.fetchall()
     fitness_md.append("\n## Health Metrics (Last 7 Logs)\n")
     fitness_md.append("| Date | Weight (lbs) | Sleep (hours) | Mood (1-10) |")
     fitness_md.append("| --- | --- | --- | --- |")
     for h in health:
-        fitness_md.append(f"| {h['date']} | {h['weight_lbs'] or 'N/A'} | {h['sleep_hours'] or 'N/A'} | {h['mood'] or 'N/A'} |")
+        fitness_md.append(f"| {h['date']} | {h['weight_lbs'] or 'N/A'} | {h['sleep_hours'] or 'N/A'} | {h['mood'] or 'N/A'}{private_marker(h['file_id'] in private_files)} |")
         
     write_file_atomically(os.path.join(VAULT_DIR, "Summaries", "Health_Fitness_Summary.md"), "\n".join(fitness_md))
         
     # 3. Learning & Career Summary
-    cursor.execute("SELECT date, topic, category, hours_spent, status FROM learning_progress ORDER BY date DESC LIMIT 10")
+    cursor.execute("SELECT date, topic, category, hours_spent, status, file_id FROM learning_progress ORDER BY date DESC LIMIT 10")
     learns = cursor.fetchall()
     
     learning_md = ["# Learning & Career Tracker\n", "## Recent Study Topics\n"]
     learning_md.append("| Date | Topic | Category | Hours | Status |")
     learning_md.append("| --- | --- | --- | --- | --- |")
     for l in learns:
-        learning_md.append(f"| {l['date']} | {l['topic']} | {l['category']} | {l['hours_spent']} hrs | {l['status'].upper()} |")
+        learning_md.append(f"| {l['date']} | {l['topic']} | {l['category']} | {l['hours_spent']} hrs | {l['status'].upper()}{private_marker(l['file_id'] in private_files)} |")
         
     cursor.execute("SELECT company, role, status, date_applied FROM job_applications ORDER BY date_applied DESC")
     jobs = cursor.fetchall()
@@ -2066,6 +2072,14 @@ def generate_daily_brief(target_date=None):
                 "exercises": ["Refer to Workout_Routine.md for today's session."]
             }
 
+        # Lines built from private notes are tagged so cloud models never see them (see privacy.py).
+        private_notes = privacy.private_note_paths()
+        def tp(t):
+            return private_marker(privacy.task_is_private(t['source_file'], private_notes))
+        routine_private = any(
+            p in private_notes for p in ("02_Areas/Fitness/Workout_Routine.md", "02_Areas/Fitness/Workout_Regimen.md")
+        )
+
         # --- Build the brief ---
         brief = []
         brief.append(f"# Daily Brief — {target_date}\n")
@@ -2086,7 +2100,7 @@ def generate_daily_brief(target_date=None):
         if due_tasks:
             for t in due_tasks:
                 cat = f" ({t['category']})" if t['category'] else ""
-                brief.append(f"- [ ] {t['title']}{cat}")
+                brief.append(f"- [ ] {t['title']}{cat}{tp(t)}")
         else:
             brief.append("- All clear — no tasks due today.")
 
@@ -2098,9 +2112,9 @@ def generate_daily_brief(target_date=None):
                 try:
                     due_dt = datetime.strptime(t['due_date'], "%Y-%m-%d")
                     days_late = (target_dt - due_dt).days
-                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date']} ({days_late}d overdue)")
+                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date']} ({days_late}d overdue){tp(t)}")
                 except (ValueError, TypeError):
-                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date'] or 'N/A'}")
+                    brief.append(f"- [ ] {t['title']}{cat} — was due {t['due_date'] or 'N/A'}{tp(t)}")
         else:
             brief.append("- No overdue tasks. You're on track.")
 
@@ -2110,16 +2124,17 @@ def generate_daily_brief(target_date=None):
             for t in upcoming_tasks:
                 cat = f" ({t['category']})" if t['category'] else ""
                 due = f" 📅 {t['due_date']}" if t['due_date'] else ""
-                brief.append(f"- [ ] {t['title']}{cat}{due}")
+                brief.append(f"- [ ] {t['title']}{cat}{due}{tp(t)}")
         else:
             brief.append("- No upcoming tasks in the queue.")
 
         # Workout Routine
         brief.append(f"\n## 🏋️ Workout Routine")
-        brief.append(f"**Routine**: {current_routine['name']}")
-        brief.append("Reference: [[02_Areas/Fitness/Workout_Routine|Workout Routine]]\n")
+        rp = private_marker(routine_private)
+        brief.append(f"**Routine**: {current_routine['name']}{rp}")
+        brief.append(f"Reference: [[02_Areas/Fitness/Workout_Routine|Workout Routine]]{rp}\n")
         for exercise in current_routine['exercises']:
-            brief.append(f"- [ ] {exercise}")
+            brief.append(f"- [ ] {exercise}{rp}")
 
         brief_path = os.path.join(VAULT_DIR, "Daily_Briefs", f"Daily_Brief_{target_date}.md")
         write_file_atomically(brief_path, "\n".join(brief) + "\n")
@@ -2186,6 +2201,9 @@ def generate_daily_summary(target_date=None):
         """, (target_date,))
         vital_log = cursor.fetchone()
 
+        # Lines built from private notes/files are tagged so cloud models never see them (see privacy.py).
+        private_notes = privacy.private_note_paths()
+
         # ---- BUILD THE SUMMARY ----
         lines = []
         lines.append("---")
@@ -2223,12 +2241,14 @@ def generate_daily_summary(target_date=None):
                         completed_time = f" at {t['completed_at'].split(' ')[1][:5]}"
                     except (IndexError, AttributeError):
                         pass
-                lines.append(f"- [x] {t['title']} ({cat}){completed_time}")
+                lines.append(f"- [x] {t['title']} ({cat}){completed_time}{private_marker(privacy.task_is_private(t['source_file'], private_notes))}")
         else:
             lines.append("- No completed tasks recorded.")
         lines.append("")
 
         # --- Transactions ---
+        private_files = privacy.private_file_ids(conn)
+        any_private_tx = any(tx['file_id'] in private_files for tx in transactions)
         lines.append("## 💰 Transactions")
         lines.append("")
         if transactions:
@@ -2236,11 +2256,11 @@ def generate_daily_summary(target_date=None):
             lines.append("| --- | --- | --- | --- |")
             for tx in transactions:
                 sign = "+" if tx['type'] == 'income' else "-"
-                lines.append(f"| {tx['merchant'] or 'N/A'} | {tx['category']} | {tx['type']} | {sign}${tx['amount']:.2f} |")
+                lines.append(f"| {tx['merchant'] or 'N/A'} | {tx['category']} | {tx['type']} | {sign}${tx['amount']:.2f}{private_marker(tx['file_id'] in private_files)} |")
             total_spent = sum(tx['amount'] for tx in transactions if tx['type'] == 'expense')
             total_income = sum(tx['amount'] for tx in transactions if tx['type'] == 'income')
             lines.append("")
-            lines.append(f"**Total spent:** ${total_spent:.2f}  |  **Total income:** ${total_income:.2f}")
+            lines.append(f"**Total spent:** ${total_spent:.2f}  |  **Total income:** ${total_income:.2f}{private_marker(any_private_tx)}")
         else:
             lines.append("- No transactions logged.")
         lines.append("")
@@ -2267,9 +2287,10 @@ def generate_daily_summary(target_date=None):
                 vital_items.append(f"- Stress: {vital_log['stress_level']}/10")
 
             if vital_items:
+                vp = private_marker('file_id' in vital_keys and vital_log['file_id'] in private_files)
                 log_date_note = f" *(Logged on {vital_log['date']})*" if vital_log['date'] != target_date else ""
-                lines.append(f"> Most recent vital log{log_date_note}:\n")
-                lines.extend(vital_items)
+                lines.append(f"> Most recent vital log{log_date_note}:{vp}\n")
+                lines.extend(item + vp for item in vital_items)
             else:
                 lines.append("- No health vitals recorded in recent log.")
         else:

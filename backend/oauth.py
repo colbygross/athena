@@ -55,7 +55,7 @@ CODE_TTL = 5 * 60
 PENDING_TTL = 10 * 60
 
 # Scopes pre-checked on the approval page when the client doesn't ask for specific ones.
-DEFAULT_SCOPES = list(DOMAINS) + ["career:write"]
+DEFAULT_SCOPES = list(ALL_SCOPES)
 
 SCOPE_LABELS = {
     "career": "Read job applications and leads",
@@ -67,6 +67,13 @@ SCOPE_LABELS = {
     "habits": "Read habit check-ins",
     "notes": "Read daily briefs and vault notes",
     "career:write": "Log applications, timeline events and leads",
+    "calendar:write": "Create, change and delete calendar events (incl. Google Calendar)",
+    "tasks:write": "Create, change, complete and delete tasks",
+    "finances:write": "Record and edit transactions, accounts, recurring payments and loans",
+    "health:write": "Log and delete vitals, workouts, meals and mindfulness",
+    "learning:write": "Log and delete study time",
+    "habits:write": "Check off habits",
+    "notes:write": "Write, append to, delete and mark notes private",
 }
 
 

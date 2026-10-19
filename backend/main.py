@@ -21,6 +21,7 @@ import career
 import finance
 import mcp_server
 import oauth
+import privacy
 
 
 # Initialize DB on startup
@@ -923,9 +924,13 @@ def add_health(log: HealthLogCreate):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            """INSERT OR REPLACE INTO health_logs 
-               (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes, water_ml, energy_level, stress_level) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO health_logs
+               (date, weight_lbs, sleep_hours, mood, systolic, diastolic, notes, water_ml, energy_level, stress_level)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(date) DO UPDATE SET
+               weight_lbs = excluded.weight_lbs, sleep_hours = excluded.sleep_hours, mood = excluded.mood,
+               systolic = excluded.systolic, diastolic = excluded.diastolic, notes = excluded.notes,
+               water_ml = excluded.water_ml, energy_level = excluded.energy_level, stress_level = excluded.stress_level""",
             (log.date, log.weight_lbs, log.sleep_hours, log.mood, log.systolic, log.diastolic, log.notes, log.water_ml, log.energy_level, log.stress_level)
         )
         conn.commit()
@@ -1922,6 +1927,48 @@ def get_calendar_gaps(date: str, day_start: str = "08:00", day_end: str = "22:00
     finally:
         conn.close()
 
+# --- PRIVACY (local dashboard only; MCP clients can never unflag) ---
+class PrivacyUpdate(BaseModel):
+    private: bool
+    path: Optional[str] = None      # vault note, e.g. "02_Areas/Health/labs.md"
+    file_id: Optional[int] = None   # ingested file (processed_files.id)
+
+@app.get("/api/privacy")
+def get_privacy():
+    conn = get_db_connection()
+    try:
+        files = conn.execute("SELECT id, original_name, new_path, category FROM processed_files ORDER BY id DESC").fetchall()
+        private_ids = privacy.private_file_ids(conn)
+        return {
+            "private_notes": sorted(privacy.private_note_paths()),
+            "private_files": [dict(f) for f in files if f["id"] in private_ids],
+        }
+    finally:
+        conn.close()
+
+@app.post("/api/privacy")
+def set_privacy(update: PrivacyUpdate):
+    if (update.path is None) == (update.file_id is None):
+        raise HTTPException(status_code=400, detail="Give exactly one of path or file_id")
+    if update.path is not None:
+        rel = update.path.replace("\\", "/").lstrip("/")
+        full = os.path.realpath(os.path.join(agent.VAULT_DIR, rel))
+        if not full.startswith(os.path.realpath(agent.VAULT_DIR) + os.sep) or not full.endswith(".md") or not os.path.isfile(full):
+            raise HTTPException(status_code=404, detail="Note not found")
+        if not update.private and privacy.in_private_folder(rel):
+            raise HTTPException(status_code=400, detail="Notes inside a Private/ folder are always private; move it out first")
+        return {"status": "success", "path": rel, "private": privacy.set_note_private(rel, update.private)}
+    conn = get_db_connection()
+    try:
+        privacy.set_file_private(conn, update.file_id, update.private)
+        conn.commit()
+        return {"status": "success", "file_id": update.file_id, "private": update.private}
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        conn.close()
+
 # --- AGENT CONTROLLER ---
 def run_agent_in_background(sync=None):
     """Run agent.run_agent_sync (or the given sync function) unless a run is already in progress."""
@@ -2005,7 +2052,7 @@ def get_daily_brief(date: str):
         
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = privacy.hide_markers(f.read())
         return {"date": date, "filename": filename, "content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2020,7 +2067,7 @@ def generate_new_brief():
         content = ""
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+                content = privacy.hide_markers(f.read())
         return {"status": "success", "date": today, "content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

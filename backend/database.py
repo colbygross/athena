@@ -170,7 +170,8 @@ def init_db():
         new_path TEXT NOT NULL,
         category TEXT NOT NULL, -- 'finances', 'health', 'fitness', 'learning', 'career', 'general'
         description TEXT,
-        processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        processed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        private INTEGER DEFAULT 0 -- 1 = local only, never shown to cloud models
     );
     """)
 
@@ -260,7 +261,8 @@ def init_db():
         mood TEXT, -- mood scale 1-10 or description
         systolic INTEGER,
         diastolic INTEGER,
-        notes TEXT
+        notes TEXT,
+        file_id INTEGER REFERENCES processed_files(id) ON DELETE SET NULL
     );
     """)
     
@@ -552,6 +554,15 @@ def init_db():
         print("Migrating: Adding google_pending column to calendar_events table...")
         cursor.execute("ALTER TABLE calendar_events ADD COLUMN google_pending INTEGER DEFAULT 0;")
     
+    # MIGRATION: Privacy. processed_files.private flags an ingested file as local-only, and
+    # health_logs.file_id records which file a vitals row came from (so it can inherit privacy).
+    if 'private' not in _table_columns(cursor, "processed_files"):
+        print("Migrating: Adding private column to processed_files table...")
+        cursor.execute("ALTER TABLE processed_files ADD COLUMN private INTEGER DEFAULT 0;")
+    if 'file_id' not in _table_columns(cursor, "health_logs"):
+        print("Migrating: Adding file_id column to health_logs table...")
+        cursor.execute("ALTER TABLE health_logs ADD COLUMN file_id INTEGER REFERENCES processed_files(id) ON DELETE SET NULL;")
+
     # MIGRATION: Add recruiter/lead columns to job_applications if they don't exist
     job_app_columns = _table_columns(cursor, "job_applications")
     if 'lead_id' not in job_app_columns:

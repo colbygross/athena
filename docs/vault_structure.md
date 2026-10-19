@@ -5,6 +5,8 @@ The **Obsidian Vault** serves as the human-readable markdown knowledge base for 
 *   **Vault Path**: [obsidian_vault/](../obsidian_vault/)
 *   **Sync Logic Source**: `backend/agent.py`
 
+> **Private notes:** add `private: true` to a note's frontmatter, or put it under a `Private/` folder, to keep it (and data derived from it) away from every cloud model. It stays readable in Obsidian, the dashboard and the local LLM. See [mcp.md](mcp.md#private-data).
+
 ---
 
 ## 1. Vault Directory Hierarchy
@@ -25,6 +27,7 @@ obsidian_vault/
 ├── 04_Archives/                # Rolled retrospectives and old notes
 ├── Daily_Briefs/               # Auto-generated daily schedule briefs
 ├── Inbox/                      # Raw file drops staging folder (triggers LLM parser)
+├── Private/                    # Local-only notes: never shown to cloud models (see docs/mcp.md)
 ├── Summaries/                  # Main rolling summary logs
 │   ├── Financial_Summary.md
 │   ├── Health_Fitness_Summary.md
