@@ -8,31 +8,41 @@ Athena exposes an [MCP](https://modelcontextprotocol.io) server so your agents (
 
 ## Scopes and tools
 
-A token can read only the domains in its scopes. Career is the only domain agents can write to.
+Each domain has a read scope and a matching `:write` scope. The approval page lets you pick exactly which ones a connection gets.
 
-| Scope | Tools |
-| --- | --- |
-| *(any)* | `get_overview`: today's snapshot, limited to the token's scopes |
-| `calendar` | `list_events(start_date, end_date)` |
-| `tasks` | `list_tasks(status, due_before, category)` |
-| `finances` | `list_transactions(start_date, end_date, account_id, category)`, `get_finance_summary()` |
-| `health` | `list_health_logs(kind = vitals \| fitness \| meals \| mindfulness, start_date, end_date)` |
-| `learning` | `list_learning(start_date, end_date)` |
-| `habits` | `list_habits(start_date, end_date)` |
-| `notes` | `list_notes(folder)`, `read_note(path)`: daily briefs, summaries, projects, areas, resources, archives |
-| `career` | `list_applications(status)`, `get_application(id)`, `list_leads(status)` |
-| `career:write` | `log_application`, `update_application_status`, `add_application_event`, `add_lead`, `dismiss_lead`, `promote_lead` |
-
-Presets:
-
-* `job-agent`: `career`, `calendar`, `tasks`, `career:write`
-* `full-read`: every read scope, no writes
+| Domain | Read tools | Write tools (`<domain>:write`) |
+| --- | --- | --- |
+| *(any)* | `get_overview`: today's snapshot, limited to the connection's scopes | |
+| `calendar` | `list_events`, `find_free_time(date)` | `create_event`, `update_event`, `delete_event` (Google-synced like dashboard events) |
+| `tasks` | `list_tasks` | `create_task`, `update_task`, `delete_task`, `add_subtask`, `update_subtask`, `delete_subtask` |
+| `finances` | `list_transactions`, `get_finance_summary` | `add_transaction`, `update_transaction`, `delete_transaction`, `add_account`, `update_account`, `add_recurring`, `update_recurring`, `pay_recurring`, `delete_recurring`, `save_student_loan` (accounts and loans can't be deleted) |
+| `health` | `list_health_logs(kind = vitals \| fitness \| meals \| mindfulness)` | `log_vitals` (merges into the day), `log_workout`, `log_meal`, `log_mindfulness`, `delete_health_entry` |
+| `learning` | `list_learning` | `log_learning`, `delete_learning_entry` |
+| `habits` | `list_habits` | `log_habit`, `delete_habit_log` |
+| `notes` | `list_notes`, `read_note` | `write_note`, `append_to_note`, `delete_note`, `mark_note_private` |
+| `career` | `list_applications`, `get_application`, `list_leads` | `log_application`, `update_application`, `update_application_status`, `add_application_event`, `delete_application`, `add_lead`, `dismiss_lead`, `promote_lead` |
 
 Write behavior:
 
-* `log_application` is safe to repeat. It updates an existing application with the same job URL, or with the same company and role (case-insensitive) within 90 days. Blank fields never overwrite data, and a repeat never moves the status backwards.
-* `add_lead` updates a lead that has the same URL.
-* Status changes and events go on the application's timeline (`application_events`) along with the token name that made them.
+* Writes go through the same code as the dashboard. Events push to Google Calendar, and tasks show up in `tasks.md` and their source notes.
+* `log_application` and `add_lead` are safe to repeat: duplicates are updated, and a repeat never moves an application's status backwards.
+* Static-token presets: `job-agent`, `full-read`, `full-access`.
+
+## Private data
+
+Mark things private and **no cloud model sees them**. They stay readable on the Athena machine: in Obsidian, in the dashboard, and by the local LLM.
+
+* **A note** is private if its frontmatter has `private: true`, or it lives inside a `Private/` folder.
+* **An ingested file** (receipt, PDF, …) is private if it's flagged in the dashboard or its companion note is private.
+* **Derived data inherits privacy:**
+  * transactions, workouts, vitals and learning entries created from a private file;
+  * tasks written inside a private note;
+  * lines of daily briefs, summaries and archives built from those. The generators tag these lines with `%%private%%`, an Obsidian comment hidden in reading view; MCP drops the lines and the dashboard hides the tag.
+* **To agents, private data looks like it doesn't exist:** it isn't listed, and reading, editing or deleting it returns "not found".
+* **Agents may mark a note private (`mark_note_private`) but can never unmark it.** Only the dashboard can, with `GET/POST /api/privacy`. Notes in `Private/` are always private.
+* **Account balances and net wealth are totals** and include every transaction. Only per-transaction detail is hidden.
+
+**Limit:** this is enforced in the MCP server. Anything with shell access to the Athena machine (SSH, Claude Code running there) can still read files directly, so don't give cloud agents shell access to the Athena machine.
 
 ## Host setup (run on the Athena machine)
 
