@@ -29,5 +29,5 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-phi4-mini:latest}
       - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-qwen3-vl:2b}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      # Public origin for OAuth (the Tailscale Funnel URL), e.g. https://host.tailnet.ts.net:8443
+      # Public origin for OAuth (the Tailscale Funnel URL), e.g. https://host.tailnet.ts.net
       - ATHENA_PUBLIC_URL=${ATHENA_PUBLIC_URL:-http://localhost:8000}

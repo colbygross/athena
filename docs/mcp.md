@@ -58,26 +58,26 @@ Write behavior:
 3. **Set the public URL and the admin password** (the password unlocks the approval page):
 
    ```bash
-   echo 'ATHENA_PUBLIC_URL=https://<machine>.<tailnet>.ts.net:8443' >> .env
+   echo 'ATHENA_PUBLIC_URL=https://<machine>.<tailnet>.ts.net' >> .env
    docker compose up -d
    docker compose exec athena python backend/mcp_tokens.py set-admin-password
    ```
 
-4. **Expose only the MCP and OAuth paths with Tailscale Funnel.** Funnel is turned on per port, so it gets its own port (8443), and only these paths are proxied. The dashboard stays tailnet-only:
+4. **Expose only the MCP and OAuth paths with Tailscale Funnel**, on the standard HTTPS port (443). claude.ai's connector service won't dial non-standard ports like 8443. Only these paths are proxied, so `/` (the dashboard) and `/api` stay tailnet-only:
 
    ```bash
    for p in /mcp /.well-known/oauth-protected-resource /.well-known/oauth-authorization-server \
             /authorize /token /register /revoke /oauth; do
-     sudo tailscale funnel --bg --https=8443 --set-path "$p" "http://127.0.0.1:8000$p"
+     sudo tailscale funnel --bg --https=443 --set-path "$p" "http://127.0.0.1:8000$p"
    done
    tailscale funnel status
    ```
 
-   Check that `https://<machine>.<tailnet>.ts.net:8443/` (the dashboard) does **not** load from outside your tailnet.
+   Check that `https://<machine>.<tailnet>.ts.net/` (the dashboard) returns 404 from outside your tailnet. Don't add a handler for `/` on port 443.
 
 ## Connecting agents
 
-**claude.ai (and cloud routines):** go to Settings → Connectors → *Add custom connector* and enter `https://<machine>.<tailnet>.ts.net:8443/mcp`. Leave the OAuth fields empty. claude.ai registers itself and opens Athena's approval page. Pick the permissions, name the connection, enter the admin password, and approve. Routines can then use the connector.
+**claude.ai (and cloud routines):** go to Settings → Connectors → *Add custom connector* and enter `https://<machine>.<tailnet>.ts.net/mcp`. Leave the OAuth fields empty. claude.ai registers itself and opens Athena's approval page. Pick the permissions, name the connection, enter the admin password, and approve. Routines can then use the connector.
 
 Manage connections:
 
@@ -89,7 +89,7 @@ docker compose exec athena python backend/mcp_tokens.py revoke-grant <id>
 **Claude Code (CLI):**
 
 ```bash
-claude mcp add --transport http athena https://<machine>.<tailnet>.ts.net:8443/mcp --header "Authorization: Bearer $ATHENA_MCP_TOKEN"
+claude mcp add --transport http athena https://<machine>.<tailnet>.ts.net/mcp --header "Authorization: Bearer $ATHENA_MCP_TOKEN"
 ```
 
 **Project `.mcp.json`** (for example, for cloud sessions; set `ATHENA_MCP_TOKEN` as a secret in the environment):
@@ -99,7 +99,7 @@ claude mcp add --transport http athena https://<machine>.<tailnet>.ts.net:8443/m
   "mcpServers": {
     "athena": {
       "type": "http",
-      "url": "https://<machine>.<tailnet>.ts.net:8443/mcp",
+      "url": "https://<machine>.<tailnet>.ts.net/mcp",
       "headers": { "Authorization": "Bearer ${ATHENA_MCP_TOKEN}" }
     }
   }
@@ -109,7 +109,7 @@ claude mcp add --transport http athena https://<machine>.<tailnet>.ts.net:8443/m
 **Smoke test:**
 
 ```bash
-curl -s https://<machine>.<tailnet>.ts.net:8443/mcp \
+curl -s https://<machine>.<tailnet>.ts.net/mcp \
   -H "Authorization: Bearer $ATHENA_MCP_TOKEN" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_overview","arguments":{}}}'
