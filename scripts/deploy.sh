@@ -34,7 +34,8 @@ main() {
     fi
 
     echo "[3/4] Building image and starting athena-prod..."
-    docker compose build
+    # --pull fetches the latest node/python base images so OS and runtime patches land each deploy.
+    docker compose build --pull
     # The app runs as archer (uid 1000); make sure nothing in the data dirs is left root-owned
     # or unreadable (older containers ran as root and wrote 0600 files).
     docker compose run --rm --no-deps --user root --entrypoint sh athena -c \

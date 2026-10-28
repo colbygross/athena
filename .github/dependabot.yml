@@ -1,0 +1,29 @@
+# Weekly PRs for stale dependencies. CI runs on each; merging to main deploys.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # No docker entry: deploy.sh builds with --pull, so node:24 / python:3.12 patches arrive on
+  # every deploy, and moving to the next Node LTS or Python version is a deliberate change.
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
