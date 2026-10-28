@@ -25,8 +25,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Optional
 
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 import agent
@@ -159,7 +159,7 @@ _session_manager = None
 async def lifespan():
     """Run the MCP session manager for the life of the web app (a new one per startup)."""
     global _session_manager
-    manager = StreamableHTTPSessionManager(app=mcp._mcp_server, json_response=True, stateless=True)
+    manager = StreamableHTTPSessionManager(app=mcp._lowlevel_server, json_response=True, stateless=True)
     async with manager.run():
         _session_manager = manager
         try:
@@ -215,7 +215,7 @@ endpoint = MCPEndpoint()
 
 # --- Tool plumbing ------------------------------------------------------------
 
-mcp = FastMCP(
+mcp = MCPServer(
     "athena",
     instructions=(
         "Athena is the user's personal life dashboard: calendar, tasks, finances, health, learning, habits, "
@@ -268,13 +268,13 @@ def athena_tool(scope):
             finally:
                 conn.close()
             _log_call(name, fn.__name__, True)
-            # Return one JSON object: FastMCP would otherwise split a list into one content block per row
+            # Return one JSON object: MCPServer would otherwise split a list into one content block per row
             # (and send nothing at all for an empty list).
             if isinstance(result, list):
                 return {"count": len(result), "items": result}
             return result
 
-        # FastMCP builds the tool schema from the signature: hide the injected `conn`.
+        # MCPServer builds the tool schema from the signature: hide the injected `conn`.
         import inspect
         sig = inspect.signature(fn)
         wrapper.__signature__ = sig.replace(parameters=[p for n, p in sig.parameters.items() if n != "conn"])
