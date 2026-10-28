@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from datetime import date, timedelta
 
 import pytest
 
@@ -100,7 +101,8 @@ def test_career_writes_record_agent(client):
     assert created["result"] == "created"
     assert call(client, token, "log_application", company="acme", role="swe")["result"] == "updated"
     call(client, token, "update_application_status", application_id=created["id"], status="interviewing", note="screen")
-    call(client, token, "add_application_event", application_id=created["id"], kind="interview", event_date="2026-10-20")
+    call(client, token, "add_application_event", application_id=created["id"], kind="interview",
+         event_date=(date.today() + timedelta(days=7)).isoformat())
     assert "update_application_status" in call(client, token, "add_application_event",
                                                application_id=created["id"], kind="status_change")["error"]
 
